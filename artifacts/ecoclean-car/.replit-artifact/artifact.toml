@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "EcoClean Car"
+description = "Sistema de ventas, órdenes y control de caja para una empresa de lavado de autos ecológico. Permite registrar vehículos, seguir cada estado, cobrar, entregar y auditar la operación por sucursal."
+version = "1.0.0"
+id = "artifacts/ecoclean-car"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22018
+
+[services.development]
+run = "pnpm --filter @workspace/ecoclean-car run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ecoclean-car", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ecoclean-car/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22018"
+BASE_PATH = "/"

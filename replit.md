@@ -1,6 +1,6 @@
-# [Project name]
+# EcoClean Car
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Software de ventas, operación y control de caja para una empresa de lavado de autos ecológico.
 
 ## Run & Operate
 
@@ -22,15 +22,27 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/ecoclean-car` — web portal, landing page, demo view and Clerk-ready access screens
+- `artifacts/api-server/src/routes/ecoclean.ts` — API routes for dashboard, services, orders, payments and audit
+- `lib/api-spec/openapi.yaml` — source of truth for API contracts
+- `lib/db/src/schema/ecoclean.ts` — PostgreSQL schema for services, orders and audit events
+- `artifacts/ecoclean-car/src/App.tsx` — portal routes and operational UI
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Orders are append-only from the operator's perspective: status changes and edits create audit events instead of deleting the original order.
+- The public landing page remains accessible without a session; operational routes use Clerk sessions in production.
+- Development preview supports an explicitly labeled demo path so the owner can review the portal before inviting the supervisor.
+- Prices are copied onto each order at intake, preserving the historical sale value even if the service catalog changes later.
+- SII readiness is represented in the settings surface, while live electronic document emission remains a separate integration step.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Owner dashboard with sales, pending payments, ready vehicles, delivered vehicles and cash by payment method.
+- Vehicle intake with automatic service pricing and EC order numbers.
+- Full lifecycle from `INGRESADO` to `ENTREGADO`, payment recording and ticket/barcode presentation.
+- Service catalog, order search and filters, customer edits, and security audit timeline.
+- Role framing for administrator and branch supervisor, with Clerk-ready sign-in pages.
 
 ## User preferences
 
@@ -38,7 +50,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Run API codegen after changing `lib/api-spec/openapi.yaml` before editing consumers.
+- Run `pnpm --filter @workspace/db run push` after changing the Drizzle schema in development.
+- The demo route is for review only; production writes require an authenticated Clerk session.
 
 ## Pointers
 

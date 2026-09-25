@@ -10,6 +10,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dashboard
+    description: Operational overview
+  - name: services
+    description: Wash service catalog
+  - name: orders
+    description: Vehicle orders
+  - name: payments
+    description: Order payments
+  - name: audit
+    description: Security audit trail
 paths:
   /healthz:
     get:
@@ -24,7 +34,188 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [dashboard]
+      summary: Get operating dashboard
+      responses:
+        "200":
+          description: Current operating metrics and recent orders
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dashboard"
+  /services:
+    get:
+      operationId: getServices
+      tags: [services]
+      summary: List active wash services
+      responses:
+        "200":
+          description: Service catalog
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Service"
+    post:
+      operationId: createService
+      tags: [services]
+      summary: Add a wash service
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServiceInput"
+      responses:
+        "201":
+          description: Service created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Service"
+  /orders:
+    get:
+      operationId: getOrders
+      tags: [orders]
+      summary: List vehicle orders
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/OrderStatus"
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Vehicle orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Create a new vehicle order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderInput"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /orders/{id}:
+    get:
+      operationId: getOrder
+      tags: [orders]
+      summary: Get an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Vehicle order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: Order not found
+    patch:
+      operationId: updateOrder
+      tags: [orders]
+      summary: Update customer details or order price
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderUpdate"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /orders/{id}/status:
+    post:
+      operationId: updateOrderStatus
+      tags: [orders]
+      summary: Move an order to the next operational status
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusInput"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /orders/{id}/payment:
+    post:
+      operationId: recordPayment
+      tags: [payments]
+      summary: Record a payment against an order
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PaymentInput"
+      responses:
+        "200":
+          description: Paid order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+  /audit:
+    get:
+      operationId: getAuditEvents
+      tags: [audit]
+      summary: List security audit events
+      responses:
+        "200":
+          description: Audit events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
 components:
+  parameters:
+    OrderId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +224,118 @@ components:
           type: string
       required:
         - status
+    Service:
+      type: object
+      required: [id, name, description, price, active]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        price: { type: integer, minimum: 0 }
+        active: { type: boolean }
+    ServiceInput:
+      type: object
+      required: [name, description, price]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        price: { type: integer, minimum: 0 }
+    OrderStatus:
+      type: string
+      enum: [INGRESADO, EN_SERVICIO, LISTO, PENDIENTE_DE_PAGO, PAGADO, ENTREGADO, ANULADO]
+    PaymentMethod:
+      type: string
+      enum: [EFECTIVO, DEBITO, CREDITO]
+    Order:
+      type: object
+      required: [id, number, plate, customer, phone, serviceId, serviceName, price, status, createdAt, updatedAt, enteredBy, lastActionBy, paymentMethod, barcode]
+      properties:
+        id: { type: integer }
+        number: { type: string }
+        plate: { type: string }
+        customer: { type: string }
+        phone: { type: string }
+        serviceId: { type: integer }
+        serviceName: { type: string }
+        price: { type: integer, minimum: 0 }
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        enteredBy: { type: string }
+        lastActionBy: { type: string }
+        paymentMethod:
+          type: ["string", "null"]
+          enum: [EFECTIVO, DEBITO, CREDITO, null]
+        barcode: { type: string }
+    OrderInput:
+      type: object
+      required: [plate, customer, phone, serviceId]
+      properties:
+        plate: { type: string, minLength: 2 }
+        customer: { type: string, minLength: 1 }
+        phone: { type: string }
+        serviceId: { type: integer }
+        priceOverride: { type: ["integer", "null"], minimum: 0 }
+    OrderUpdate:
+      type: object
+      properties:
+        customer: { type: string }
+        phone: { type: string }
+        priceOverride: { type: ["integer", "null"], minimum: 0 }
+        reason: { type: ["string", "null"] }
+    OrderStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/OrderStatus"
+        reason: { type: ["string", "null"] }
+    PaymentInput:
+      type: object
+      required: [method]
+      properties:
+        method:
+          $ref: "#/components/schemas/PaymentMethod"
+        amount: { type: ["integer", "null"], minimum: 0 }
+    AuditEvent:
+      type: object
+      required: [id, action, description, actor, timestamp, severity]
+      properties:
+        id: { type: integer }
+        action: { type: string }
+        description: { type: string }
+        actor: { type: string }
+        timestamp: { type: string, format: date-time }
+        severity:
+          type: string
+          enum: [INFO, WARNING, CRITICAL]
+    Dashboard:
+      type: object
+      required: [todaySales, todayOrders, pendingPayment, readyVehicles, deliveredToday, cashExpected, cashByMethod, statusCounts, recentOrders, recentActivity]
+      properties:
+        todaySales: { type: integer }
+        todayOrders: { type: integer }
+        pendingPayment: { type: integer }
+        readyVehicles: { type: integer }
+        deliveredToday: { type: integer }
+        cashExpected: { type: integer }
+        cashByMethod:
+          type: object
+          required: [EFECTIVO, DEBITO, CREDITO]
+          properties:
+            EFECTIVO: { type: integer }
+            DEBITO: { type: integer }
+            CREDITO: { type: integer }
+        statusCounts:
+          type: object
+          additionalProperties: { type: integer }
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        recentActivity:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
 

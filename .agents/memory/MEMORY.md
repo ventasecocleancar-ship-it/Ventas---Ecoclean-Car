@@ -1,0 +1,1 @@
+- [EcoClean audit model](ecoclean-audit-model.md) — preserve order history and record every operational, price, payment, and cancellation action as an audit event.
