@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import {
   CreateOrderBody,
   CreateServiceBody,
   GetOrdersQueryParams,
+  InviteUserBody,
   RecordPaymentBody,
   UpdateOrderBody,
   UpdateOrderStatusBody,
@@ -33,6 +34,8 @@ const statuses = [
 const paymentMethods = ["EFECTIVO", "DEBITO", "CREDITO"] as const;
 type PaymentMethod = (typeof paymentMethods)[number];
 type OrderStatus = (typeof statuses)[number];
+const userRoles = ["ADMIN", "SUPERVISOR", "CAJERO", "OPERADOR"] as const;
+type UserRole = (typeof userRoles)[number];
 
 function actorFor(req: Request) {
   const userId = getAuth(req).userId;
@@ -48,6 +51,76 @@ function requireActor(req: Request, res: Parameters<Parameters<IRouter["get"]>[1
     return null;
   }
   return actor;
+}
+
+function userRole(metadata: Record<string, unknown> | null | undefined): UserRole {
+  const role = metadata?.role;
+  return typeof role === "string" && userRoles.includes(role as UserRole)
+    ? (role as UserRole)
+    : "SUPERVISOR";
+}
+
+function primaryEmail(user: { primaryEmailAddressId: string | null; emailAddresses: Array<{ id: string; emailAddress: string }> }) {
+  return (
+    user.emailAddresses.find((email) => email.id === user.primaryEmailAddressId)?.emailAddress ??
+    user.emailAddresses[0]?.emailAddress ??
+    ""
+  );
+}
+
+function serializeUser(user: {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  primaryEmailAddressId: string | null;
+  emailAddresses: Array<{ id: string; emailAddress: string }>;
+  publicMetadata: Record<string, unknown>;
+  banned: boolean;
+  createdAt: number;
+}) {
+  return {
+    id: user.id,
+    email: primaryEmail(user),
+    firstName: user.firstName ?? "",
+    lastName: user.lastName ?? "",
+    role: userRole(user.publicMetadata),
+    status: user.banned ? "BLOQUEADO" as const : "ACTIVO" as const,
+    createdAt: new Date(user.createdAt).toISOString(),
+    invitationId: null,
+  };
+}
+
+async function requireAdmin(
+  req: Request,
+  res: Parameters<Parameters<IRouter["get"]>[1]>[1],
+) {
+  const userId = getAuth(req).userId;
+  if (!userId) {
+    res.status(401).json({ error: "Debes iniciar sesión para administrar usuarios" });
+    return null;
+  }
+
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    if (userRole(user.publicMetadata) === "ADMIN") {
+      return { userId, user };
+    }
+
+    // The first Clerk account bootstraps the owner as administrator.
+    const users = await clerkClient.users.getUserList({ limit: 1 });
+    if (users.totalCount === 1 && users.data[0]?.id === userId) {
+      await clerkClient.users.updateUserMetadata(userId, {
+        publicMetadata: { ...user.publicMetadata, role: "ADMIN" },
+      });
+      return { userId, user };
+    }
+  } catch {
+    res.status(503).json({ error: "No se pudo consultar el servicio de usuarios de Clerk" });
+    return null;
+  }
+
+  res.status(403).json({ error: "Solo un administrador puede administrar usuarios" });
+  return null;
 }
 
 function orderNumber(id: number) {
@@ -389,6 +462,99 @@ router.get("/audit", async (req, res) => {
   if (!requireActor(req, res)) return;
   const rows = await db.select().from(auditEvents).orderBy(desc(auditEvents.timestamp)).limit(100);
   res.json(rows.map(serializeAudit));
+});
+
+router.get("/bootstrap", async (_req, res) => {
+  try {
+    const users = await clerkClient.users.getUserList({ limit: 1 });
+    res.json({ allowed: users.totalCount === 0 });
+  } catch {
+    res.status(503).json({ error: "No se pudo verificar el estado inicial de Clerk" });
+  }
+});
+
+router.get("/users", async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+
+  try {
+    const [users, invitations] = await Promise.all([
+      clerkClient.users.getUserList({ limit: 100, orderBy: "-created_at" }),
+      clerkClient.invitations.getInvitationList({ limit: 100, status: "pending", orderBy: "-created_at" }),
+    ]);
+    const accounts = users.data.map(serializeUser);
+    const knownEmails = new Set(accounts.map((account) => account.email.toLowerCase()));
+    const pending = invitations.data
+      .filter((invitation) => !knownEmails.has(invitation.emailAddress.toLowerCase()))
+      .map((invitation) => ({
+        id: invitation.id,
+        email: invitation.emailAddress,
+        firstName: typeof invitation.publicMetadata?.firstName === "string" ? invitation.publicMetadata.firstName : "",
+        lastName: typeof invitation.publicMetadata?.lastName === "string" ? invitation.publicMetadata.lastName : "",
+        role: userRole(invitation.publicMetadata),
+        status: "INVITADO" as const,
+        createdAt: new Date(invitation.createdAt).toISOString(),
+        invitationId: invitation.id,
+      }));
+    res.json([...accounts, ...pending]);
+  } catch {
+    res.status(503).json({ error: "No se pudo cargar el equipo desde Clerk" });
+  }
+});
+
+router.post("/users", async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+  const input = InviteUserBody.parse(req.body);
+
+  try {
+    const invitation = await clerkClient.invitations.createInvitation({
+      emailAddress: input.email.toLowerCase().trim(),
+      notify: true,
+      publicMetadata: {
+        role: input.role,
+        firstName: input.firstName.trim(),
+        lastName: input.lastName.trim(),
+      },
+    });
+    await addAudit(
+      admin.userId,
+      "USUARIO_INVITADO",
+      `Invitación creada para ${input.email} con rol ${input.role}`,
+      undefined,
+      "INFO",
+    );
+    res.status(201).json({
+      id: invitation.id,
+      email: invitation.emailAddress,
+      firstName: input.firstName.trim(),
+      lastName: input.lastName.trim(),
+      role: input.role,
+      status: "INVITADO",
+      createdAt: new Date(invitation.createdAt).toISOString(),
+      invitationId: invitation.id,
+    });
+  } catch {
+    res.status(400).json({ error: "No se pudo crear la invitación. Verifica que el correo no esté registrado." });
+  }
+});
+
+router.delete("/users/:id", async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+  const userId = req.params.id;
+  if (userId === admin.userId) {
+    res.status(400).json({ error: "No puedes eliminar tu propio acceso de administrador" });
+    return;
+  }
+
+  try {
+    await clerkClient.users.deleteUser(userId);
+    await addAudit(admin.userId, "USUARIO_ELIMINADO", `Acceso ${userId} eliminado por el administrador`, undefined, "WARNING");
+    res.status(204).send();
+  } catch {
+    res.status(404).json({ error: "Usuario no encontrado o ya eliminado" });
+  }
 });
 
 export default router;

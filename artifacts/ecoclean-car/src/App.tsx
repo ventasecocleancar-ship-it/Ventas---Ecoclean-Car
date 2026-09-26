@@ -6,16 +6,18 @@ import { shadcn } from '@clerk/themes';
 import {
   Activity, ArrowLeft, ArrowRight, Bell, Boxes, CarFront, Check, ChevronRight,
   CircleDollarSign, ClipboardCheck, Clock3, Droplets, ExternalLink, FileClock, Filter, Gauge,
-  LayoutDashboard, Menu, MoreHorizontal, PanelLeft, Plus, Printer, ReceiptText,
-  RefreshCw, Search, Settings2, ShieldCheck, Sparkles, WalletCards, X,
+  LayoutDashboard, Mail, Menu, MoreHorizontal, PanelLeft, Plus, Printer, ReceiptText,
+  RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, WalletCards, X,
 } from 'lucide-react';
 import { Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
   AuditEventSeverity, OrderStatus, PaymentMethod,
   type AuditEvent, type Dashboard, type Order, type Service,
   getGetAuditEventsQueryKey, getGetDashboardQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey,
-  getGetServicesQueryKey, useCreateOrder, useCreateService, useGetAuditEvents, useGetDashboard,
-  useGetOrder, useGetOrders, useGetServices, useRecordPayment, useUpdateOrder, useUpdateOrderStatus,
+  getGetBootstrapStatusQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteUser,
+  useGetAuditEvents, useGetBootstrapStatus, useGetDashboard, useGetOrder, useGetOrders, useGetServices, useGetUsers,
+  useInviteUser, useRecordPayment, useUpdateOrder, useUpdateOrderStatus,
+  type UserAccount, UserRole,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Button } from '@/components/ui/button';
@@ -115,6 +117,10 @@ const demoDashboard: Dashboard = {
   cashByMethod: { EFECTIVO: 184700, DEBITO: 96500, CREDITO: 45200 }, statusCounts: { INGRESADO: 3, EN_SERVICIO: 8, LISTO: 6, PENDIENTE_DE_PAGO: 4, PAGADO: 2, ENTREGADO: 24 },
   recentOrders: demoOrders, recentActivity: demoAudit,
 };
+const demoUsers: UserAccount[] = [
+  { id: 'demo-admin', email: 'admin@ecocleancar.cl', firstName: 'Jeff', lastName: 'Medina', role: UserRole.ADMIN, status: 'ACTIVO', createdAt: new Date(Date.now() - 45 * 86400000).toISOString(), invitationId: null },
+  { id: 'demo-supervisor', email: 'supervisor@ecocleancar.cl', firstName: 'Supervisor', lastName: 'de sucursal', role: UserRole.SUPERVISOR, status: 'INVITADO', createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), invitationId: 'demo-invitation' },
+];
 
 function Logo({ dark = false }: { dark?: boolean }) {
   return <Link href="/" data-testid="link-brand" className="flex items-center gap-3">
@@ -134,7 +140,7 @@ function PublicHome() {
       <Logo />
       <div className="flex items-center gap-3">
         <Link href="/sign-in" data-testid="link-sign-in" className="hidden text-sm font-bold text-[#285c4d] transition-colors hover:text-[#1e6b58] sm:block">Ingresar</Link>
-        <Link href="/sign-up" data-testid="link-sign-up" className="rounded-full bg-[#1e6b58] px-4 py-2.5 text-sm font-bold text-[#fbf5e8] shadow-sm transition-transform hover:-translate-y-0.5">Crear acceso</Link>
+         <Link href="/sign-in" data-testid="link-admin-access" className="rounded-full bg-[#1e6b58] px-4 py-2.5 text-sm font-bold text-[#fbf5e8] shadow-sm transition-transform hover:-translate-y-0.5">Acceso administrador</Link>
       </div>
     </header>
     <section className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-16 lg:grid-cols-[1.06fr_.94fr] lg:px-10 lg:pb-28 lg:pt-24">
@@ -181,10 +187,15 @@ function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
 }
 
 function ClerkSignInPage() {
-  return <div className="app-grid flex min-h-[100dvh] items-center justify-center px-4 py-10"><SignIn routing="path" path={`${basePath}/sign-in`} signUpUrl={`${basePath}/sign-up`} /></div>;
+  return <div className="app-grid flex min-h-[100dvh] items-center justify-center px-4 py-10"><SignIn routing="path" path={`${basePath}/sign-in`} /></div>;
 }
 
 function ClerkSignUpPage() {
+  const bootstrap = useGetBootstrapStatus({ query: { queryKey: getGetBootstrapStatusQueryKey(), retry: false } });
+  const invited = new URLSearchParams(window.location.search).has('__clerk_ticket');
+  const canSignUp = invited || bootstrap.data?.allowed === true;
+  if (bootstrap.isLoading) return <div className="app-grid flex min-h-[100dvh] items-center justify-center px-4 py-10"><p className="rounded-2xl bg-[#f8f4e9] px-6 py-5 text-sm font-semibold text-[#355d50]">Verificando el acceso inicial…</p></div>;
+  if (!canSignUp) return <div className="app-grid flex min-h-[100dvh] items-center justify-center px-4 py-10"><div className="w-full max-w-md rounded-3xl bg-[#f8f4e9] p-8 text-center shadow-[0_24px_80px_rgba(27,73,59,.13)]"><ShieldCheck className="mx-auto h-10 w-10 text-[#1e6b58]" /><h1 className="display-font mt-4 text-2xl font-bold text-[#173a32]">Acceso por invitación</h1><p className="mt-3 text-sm leading-6 text-[#71877e]">El registro público está desactivado. Pide al administrador de EcoClean que cree tu usuario y revisa tu correo para activar el acceso.</p><Link href="/sign-in" className="mt-6 inline-flex rounded-xl bg-[#1e6b58] px-5 py-3 text-sm font-bold text-white">Volver a ingresar</Link></div></div>;
   return <div className="app-grid flex min-h-[100dvh] items-center justify-center px-4 py-10"><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></div>;
 }
 
@@ -235,6 +246,7 @@ function DashboardPage() {
 
 function PreviewNotice() { return <div data-testid="status-demo-preview" className="mb-5 flex items-center gap-3 rounded-xl border border-[#e6d29b] bg-[#fff5d8] px-4 py-3 text-xs text-[#82651d]"><Sparkles size={16} /><span><strong>Vista de demostración:</strong> la API no está conectada. Las acciones de guardado siguen protegidas.</span></div>; }
 function methodLabel(method: string) { return method === 'EFECTIVO' ? 'Efectivo' : method === 'DEBITO' ? 'Débito' : 'Crédito'; }
+function roleLabel(role: string) { return role === 'ADMIN' ? 'Administrador' : role === 'SUPERVISOR' ? 'Supervisor' : role === 'CAJERO' ? 'Cajero' : 'Operador'; }
 function RecentOrders({ orders }: { orders: Order[] }) { return <Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader className="flex-row items-center justify-between space-y-0 px-5 py-4"><div><CardTitle className="display-font text-lg text-[#173a32]">Actividad reciente</CardTitle><p className="mt-1 text-xs text-[#789087]">Últimas órdenes en tu sucursal</p></div><Link href="/orders" data-testid="link-recent-orders" className="rounded-lg p-2 text-[#4d7566] hover:bg-[#eef5ef]"><ArrowRight size={17} /></Link></CardHeader><CardContent className="p-0">{orders.slice(0, 4).map(order => <Link href={`/orders/${order.id}`} key={order.id} data-testid={`row-recent-order-${order.id}`} className="flex items-center gap-4 border-t border-[#e7e8df] px-5 py-4 transition-colors hover:bg-[#f4f5ed]"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#e5efe8] text-[#2f9274]"><CarFront size={17} /></span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><strong className="mono text-xs text-[#285c4d]">{order.number}</strong><span className="text-[11px] text-[#84988f]">{order.plate}</span></span><span className="mt-1 block truncate text-xs text-[#71877e]">{order.customer} · {order.serviceName}</span></span><span className="hidden sm:block"><StatusBadge status={order.status} /></span><span className="text-xs font-bold text-[#285c4d]">{money(order.price)}</span></Link>)}</CardContent></Card>; }
 function ActivityPanel({ events }: { events: AuditEvent[] }) { return <Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader className="px-5 py-4"><CardTitle className="display-font text-lg text-[#173a32]">Últimos movimientos</CardTitle><p className="mt-1 text-xs text-[#789087]">Registro de actividad de hoy</p></CardHeader><CardContent className="space-y-4 px-5">{events.slice(0, 4).map(event => <div key={event.id} data-testid={`activity-event-${event.id}`} className="flex gap-3"><span className={`mt-1 grid h-7 w-7 shrink-0 place-items-center rounded-lg ${event.severity === 'WARNING' ? 'bg-[#fff0c9] text-[#9b771c]' : 'bg-[#e4efe9] text-[#2f9274]'}`}><Activity size={14} /></span><div className="min-w-0"><p className="text-xs font-semibold leading-5 text-[#355d50]">{event.description}</p><p className="mt-1 text-[10px] text-[#8aa097]">{event.actor} · {shortDate(event.timestamp)}</p></div></div>)}</CardContent></Card>; }
 
@@ -306,9 +318,60 @@ function AuditPage() {
 }
 
 function SettingsPage() {
-  return <div className="page-in"><PageTitle eyebrow="Control del sistema" title="Configuración" description="Quién opera, dónde opera y qué falta para cerrar la cadena." /><div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Equipo y permisos</CardTitle><p className="text-xs text-[#789087]">El rol define qué puede mover cada persona.</p></CardHeader><CardContent className="space-y-3"><TeamRow initials="DM" name="Diego Morales" email="diego@ecocleancar.cl" role="Supervisor" tone="bg-[#f4c957]" /><TeamRow initials="MS" name="Martina Soto" email="martina@ecocleancar.cl" role="Cajera" tone="bg-[#c5dfcf]" /><TeamRow initials="PD" name="Paula Díaz" email="paula@ecocleancar.cl" role="Operadora" tone="bg-[#d9e8ef]" /><Button type="button" data-testid="button-invite-user" onClick={() => alert('La invitación quedará disponible cuando el equipo de usuarios esté conectado.')} variant="outline" className="mt-3 w-full rounded-xl border-dashed border-[#b9cdc0] text-xs font-bold text-[#2f9274]"><Plus size={15} /> Invitar integrante</Button></CardContent></Card><div className="space-y-5"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Sucursal activa</CardTitle></CardHeader><CardContent><div className="rounded-2xl bg-[#e4efe9] p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1e6b58] text-white"><PanelLeft size={18} /></span><div><p className="text-sm font-bold text-[#285c4d]">EcoClean Car · Vitacura</p><p className="mt-1 text-xs text-[#668279]">Av. Nueva Costanera 3900 · Santiago</p></div></div></div><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl border border-[#e1e5dc] p-3"><p className="text-[10px] uppercase tracking-wider text-[#8aa097]">Zona horaria</p><p className="mt-1 text-xs font-bold text-[#355d50]">America/Santiago</p></div><div className="rounded-xl border border-[#e1e5dc] p-3"><p className="text-[10px] uppercase tracking-wider text-[#8aa097]">Moneda</p><p className="mt-1 text-xs font-bold text-[#355d50]">Peso chileno · CLP</p></div></div></CardContent></Card><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Preparación SII</CardTitle><p className="text-xs text-[#789087]">Estado de la conexión tributaria.</p></CardHeader><CardContent><div className="flex items-center gap-3 rounded-xl border border-[#e5d9b5] bg-[#fff7df] p-4"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#f4c957] text-[#173a32]"><ReceiptText size={17} /></span><div><p className="text-xs font-bold text-[#765b17]">Pendiente de configuración</p><p className="mt-1 text-[11px] leading-4 text-[#967c38]">Conecta tu folio y certificado para emitir documentos desde la operación.</p></div></div><Button type="button" data-testid="button-configure-sii" onClick={() => alert('La configuración SII se habilitará al conectar el proveedor tributario.')} className="mt-4 w-full rounded-xl bg-[#173a32] text-xs font-bold text-white hover:bg-[#285c4d]">Revisar preparación</Button></CardContent></Card></div></div></div>;
+  const usersQuery = useGetUsers({ query: { queryKey: getGetUsersQueryKey(), retry: false } });
+  const users = usersQuery.data ?? (usersQuery.isError ? demoUsers : []);
+  const invite = useInviteUser();
+  const remove = useDeleteUser();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [form, setForm] = useState({ email: '', firstName: '', lastName: '', role: UserRole.SUPERVISOR });
+
+  const submitInvite = (event: FormEvent) => {
+    event.preventDefault();
+    setNotice('');
+    invite.mutate({ data: form }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetUsersQueryKey() });
+        setForm({ email: '', firstName: '', lastName: '', role: UserRole.SUPERVISOR });
+        setInviteOpen(false);
+        setNotice('Invitación enviada. El colaborador podrá activar su acceso desde su correo.');
+      },
+      onError: () => setNotice('No se pudo crear la invitación. Revisa el correo o tus permisos de administrador.'),
+    });
+  };
+
+  const deleteAccount = (account: UserAccount) => {
+    if (account.status === 'INVITADO') {
+      setNotice('Las invitaciones pendientes se gestionan desde Clerk antes de que el colaborador active su acceso.');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar el acceso de ${account.firstName} ${account.lastName}? Esta acción no elimina sus órdenes ni la auditoría.`)) return;
+    remove.mutate({ id: account.id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetUsersQueryKey() });
+        setNotice('Usuario eliminado. Sus órdenes y acciones históricas se conservaron.');
+      },
+      onError: () => setNotice('No se pudo eliminar el usuario. Verifica que estés usando una cuenta administradora.'),
+    });
+  };
+
+  return <div className="page-in">
+    <PageTitle eyebrow="Control del sistema" title="Configuración" description="Solo el administrador crea y elimina accesos. Las órdenes y auditorías no se borran al retirar a una persona." action={<Button type="button" data-testid="button-invite-user" onClick={() => setInviteOpen(true)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><UserPlus size={17} /> Crear usuario</Button>} />
+    {usersQuery.isError && <PreviewNotice />}
+    {notice && <div data-testid="status-user-notice" className="mb-5 rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]">{notice}</div>}
+    {inviteOpen && <Card className="mb-5 border-[#bdd7c6] bg-[#eef6ef]"><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="display-font text-lg text-[#173a32]">Crear acceso de colaborador</CardTitle><p className="text-xs text-[#668279]">Se enviará una invitación. No necesitas conocer ni guardar su contraseña.</p></div><button type="button" data-testid="button-close-invite-form" onClick={() => setInviteOpen(false)}><X size={18} className="text-[#668279]" /></button></CardHeader><CardContent><form onSubmit={submitInvite} className="grid gap-4 md:grid-cols-2"><div><Label htmlFor="user-first-name">Nombre</Label><Input id="user-first-name" data-testid="input-user-first-name" value={form.firstName} onChange={event => setForm({ ...form, firstName: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Nombre" /></div><div><Label htmlFor="user-last-name">Apellido</Label><Input id="user-last-name" data-testid="input-user-last-name" value={form.lastName} onChange={event => setForm({ ...form, lastName: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Apellido" /></div><div><Label htmlFor="user-email">Correo de trabajo</Label><Input id="user-email" data-testid="input-user-email" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="colaborador@ecocleancar.cl" /></div><div><Label htmlFor="user-role">Rol</Label><select id="user-role" data-testid="select-user-role" value={form.role} onChange={event => setForm({ ...form, role: event.target.value as typeof form.role })} className="mt-2 h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]"><option value={UserRole.SUPERVISOR}>Supervisor</option><option value={UserRole.CAJERO}>Cajero</option><option value={UserRole.OPERADOR}>Operador</option></select></div><div className="flex gap-3 md:col-span-2"><Button type="submit" data-testid="button-submit-user-invite" disabled={invite.isPending} className="rounded-xl bg-[#1e6b58] font-bold text-white">{invite.isPending ? 'Enviando…' : 'Enviar invitación'} <Mail size={15} /></Button><Button type="button" onClick={() => setInviteOpen(false)} variant="outline" className="rounded-xl border-[#ccd9d1] font-bold text-[#285c4d]">Cancelar</Button></div></form></CardContent></Card>}
+    <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
+      <Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Equipo y permisos</CardTitle><p className="text-xs text-[#789087]">El colaborador activa su cuenta, pero solo tú administra sus accesos.</p></CardHeader><CardContent className="space-y-3">{users.map(account => <TeamRow key={account.id} account={account} onDelete={deleteAccount} disabled={remove.isPending} />)}{!users.length && !usersQuery.isLoading && <p className="rounded-xl border border-dashed border-[#cbd9cf] p-6 text-center text-xs text-[#789087]">No hay usuarios visibles todavía.</p>}</CardContent></Card>
+      <div className="space-y-5"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Sucursal activa</CardTitle></CardHeader><CardContent><div className="rounded-2xl bg-[#e4efe9] p-4"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#1e6b58] text-white"><PanelLeft size={18} /></span><div><p className="text-sm font-bold text-[#285c4d]">EcoClean Car · Vitacura</p><p className="mt-1 text-xs text-[#668279]">Av. Nueva Costanera 3900 · Santiago</p></div></div></div><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl border border-[#e1e5dc] p-3"><p className="text-[10px] uppercase tracking-wider text-[#8aa097]">Zona horaria</p><p className="mt-1 text-xs font-bold text-[#355d50]">America/Santiago</p></div><div className="rounded-xl border border-[#e1e5dc] p-3"><p className="text-[10px] uppercase tracking-wider text-[#8aa097]">Moneda</p><p className="mt-1 text-xs font-bold text-[#355d50]">Peso chileno · CLP</p></div></div></CardContent></Card><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Preparación SII</CardTitle><p className="text-xs text-[#789087]">Estado de la conexión tributaria.</p></CardHeader><CardContent><div className="flex items-center gap-3 rounded-xl border border-[#e5d9b5] bg-[#fff7df] p-4"><span className="grid h-9 w-9 place-items-center rounded-lg bg-[#f4c957] text-[#173a32]"><ReceiptText size={17} /></span><div><p className="text-xs font-bold text-[#765b17]">Pendiente de configuración</p><p className="mt-1 text-[11px] leading-4 text-[#967c38]">Conecta tu folio y certificado para emitir documentos desde la operación.</p></div></div><Button type="button" data-testid="button-configure-sii" onClick={() => alert('La configuración SII se habilitará al conectar el proveedor tributario.')} className="mt-4 w-full rounded-xl bg-[#173a32] text-xs font-bold text-white hover:bg-[#285c4d]">Revisar preparación</Button></CardContent></Card></div>
+    </div>
+  </div>;
 }
-function TeamRow({ initials, name, email, role, tone }: { initials: string; name: string; email: string; role: string; tone: string }) { return <div data-testid={`row-team-${initials}`} className="flex items-center gap-3 rounded-xl border border-[#e4e7df] bg-[#fbf8ef] p-3"><span className={`grid h-9 w-9 place-items-center rounded-full text-xs font-bold text-[#285c4d] ${tone}`}>{initials}</span><div className="min-w-0 flex-1"><p className="text-xs font-bold text-[#355d50]">{name}</p><p className="mt-1 truncate text-[10px] text-[#8aa097]">{email}</p></div><span className="rounded-full bg-[#e4efe9] px-2.5 py-1 text-[10px] font-bold text-[#2d765e]">{role}</span></div>; }
+
+function TeamRow({ account, onDelete, disabled }: { account: UserAccount; onDelete: (account: UserAccount) => void; disabled: boolean }) {
+  const initials = `${account.firstName[0] ?? ''}${account.lastName[0] ?? ''}`.toUpperCase() || 'US';
+  const tone = account.role === UserRole.ADMIN ? 'bg-[#f4c957]' : account.role === UserRole.SUPERVISOR ? 'bg-[#c5dfcf]' : 'bg-[#d9e8ef]';
+  return <div data-testid={`row-team-${account.id}`} className="flex items-center gap-3 rounded-xl border border-[#e4e7df] bg-[#fbf8ef] p-3"><span className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-bold text-[#285c4d] ${tone}`}>{initials}</span><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><p className="truncate text-xs font-bold text-[#355d50]">{account.firstName} {account.lastName}</p><span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${account.status === 'INVITADO' ? 'bg-[#fff0c9] text-[#906d19]' : account.status === 'BLOQUEADO' ? 'bg-[#f9e3d9] text-[#a64a30]' : 'bg-[#e4efe9] text-[#2d765e]'}`}>{account.status === 'INVITADO' ? 'Invitado' : account.status === 'BLOQUEADO' ? 'Bloqueado' : 'Activo'}</span></div><p className="mt-1 flex items-center gap-1 truncate text-[10px] text-[#8aa097]"><Mail size={11} /> {account.email}</p></div><span className="hidden rounded-full bg-[#e4efe9] px-2.5 py-1 text-[10px] font-bold text-[#2d765e] sm:inline-flex">{roleLabel(account.role)}</span>{account.status !== 'INVITADO' && account.role !== UserRole.ADMIN && <button type="button" data-testid={`button-delete-user-${account.id}`} disabled={disabled} onClick={() => onDelete(account)} aria-label={`Eliminar a ${account.firstName} ${account.lastName}`} className="rounded-lg p-2 text-[#a64a30] hover:bg-[#f9e3d9] disabled:opacity-50"><Trash2 size={15} /></button>}</div>;
+}
 
 function Router() {
   return <ErrorBoundary resetKey={location.pathname}><Switch><Route path="/" component={HomeRoute} /><Route path="/sign-in/*?" component={clerkPubKey ? ClerkSignInPage : () => <AuthPage mode="sign-in" />} /><Route path="/sign-up/*?" component={clerkPubKey ? ClerkSignUpPage : () => <AuthPage mode="sign-up" />} /><Route path="/dashboard"><PortalGuard><AppShell><DashboardPage /></AppShell></PortalGuard></Route><Route path="/orders/new"><PortalGuard><AppShell><NewOrderPage /></AppShell></PortalGuard></Route><Route path="/orders/:id"><PortalGuard><AppShell><OrderDetailPage /></AppShell></PortalGuard></Route><Route path="/orders"><PortalGuard><AppShell><OrdersPage /></AppShell></PortalGuard></Route><Route path="/services"><PortalGuard><AppShell><ServicesPage /></AppShell></PortalGuard></Route><Route path="/audit"><PortalGuard><AppShell><AuditPage /></AppShell></PortalGuard></Route><Route path="/settings"><PortalGuard><AppShell><SettingsPage /></AppShell></PortalGuard></Route><Route><Redirect to="/" /></Route></Switch></ErrorBoundary>;

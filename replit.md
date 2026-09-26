@@ -32,6 +32,7 @@ Software de ventas, operación y control de caja para una empresa de lavado de a
 
 - Orders are append-only from the operator's perspective: status changes and edits create audit events instead of deleting the original order.
 - The public landing page remains accessible without a session; operational routes use Clerk sessions in production.
+- User lifecycle is administrator-controlled: the first Clerk account bootstraps as `ADMIN`, collaborators are invited with a role, and deleting access never deletes operational history.
 - Development preview supports an explicitly labeled demo path so the owner can review the portal before inviting the supervisor.
 - Prices are copied onto each order at intake, preserving the historical sale value even if the service catalog changes later.
 - SII readiness is represented in the settings surface, while live electronic document emission remains a separate integration step.
@@ -43,6 +44,7 @@ Software de ventas, operación y control de caja para una empresa de lavado de a
 - Full lifecycle from `INGRESADO` to `ENTREGADO`, payment recording and ticket/barcode presentation.
 - Service catalog, order search and filters, customer edits, and security audit timeline.
 - Role framing for administrator and branch supervisor, with Clerk-ready sign-in pages.
+- Administrator-controlled collaborator invitations and account removal through the settings surface.
 
 ## User preferences
 
@@ -53,6 +55,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Run API codegen after changing `lib/api-spec/openapi.yaml` before editing consumers.
 - Run `pnpm --filter @workspace/db run push` after changing the Drizzle schema in development.
 - The demo route is for review only; production writes require an authenticated Clerk session.
+- User management uses Clerk invitations and metadata; no EcoClean table stores passwords or private credentials.
 
 ## Pointers
 

@@ -20,6 +20,8 @@ tags:
     description: Order payments
   - name: audit
     description: Security audit trail
+  - name: users
+    description: Administrator-controlled user access
 paths:
   /healthz:
     get:
@@ -208,6 +210,63 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AuditEvent"
+  /users:
+    get:
+      operationId: getUsers
+      tags: [users]
+      summary: List EcoClean users
+      responses:
+        "200":
+          description: Current user accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserAccount"
+    post:
+      operationId: inviteUser
+      tags: [users]
+      summary: Invite a collaborator to EcoClean
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserInput"
+      responses:
+        "201":
+          description: User invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserAccount"
+  /bootstrap:
+    get:
+      operationId: getBootstrapStatus
+      tags: [users]
+      summary: Check whether the first administrator can be created
+      responses:
+        "200":
+          description: Bootstrap status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BootstrapStatus"
+  /users/{id}:
+    delete:
+      operationId: deleteUser
+      tags: [users]
+      summary: Delete a collaborator account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: User deleted
 components:
   parameters:
     OrderId:
@@ -310,6 +369,40 @@ components:
         severity:
           type: string
           enum: [INFO, WARNING, CRITICAL]
+    UserRole:
+      type: string
+      enum: [ADMIN, SUPERVISOR, CAJERO, OPERADOR]
+    UserStatus:
+      type: string
+      enum: [INVITADO, ACTIVO, BLOQUEADO]
+    UserAccount:
+      type: object
+      required: [id, email, firstName, lastName, role, status, createdAt]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        firstName: { type: string }
+        lastName: { type: string }
+        role:
+          $ref: "#/components/schemas/UserRole"
+        status:
+          $ref: "#/components/schemas/UserStatus"
+        createdAt: { type: string, format: date-time }
+        invitationId: { type: ["string", "null"] }
+    UserInput:
+      type: object
+      required: [email, firstName, lastName, role]
+      properties:
+        email: { type: string, format: email }
+        firstName: { type: string, minLength: 1 }
+        lastName: { type: string, minLength: 1 }
+        role:
+          $ref: "#/components/schemas/UserRole"
+    BootstrapStatus:
+      type: object
+      required: [allowed]
+      properties:
+        allowed: { type: boolean }
     Dashboard:
       type: object
       required: [todaySales, todayOrders, pendingPayment, readyVehicles, deliveredToday, cashExpected, cashByMethod, statusCounts, recentOrders, recentActivity]

@@ -21,6 +21,7 @@ import type {
 
 import type {
   AuditEvent,
+  BootstrapStatus,
   Dashboard,
   GetOrdersParams,
   HealthStatus,
@@ -30,7 +31,9 @@ import type {
   OrderUpdate,
   PaymentInput,
   Service,
-  ServiceInput
+  ServiceInput,
+  UserAccount,
+  UserInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -972,4 +975,320 @@ export function useGetAuditEvents<TData = Awaited<ReturnType<typeof getAuditEven
 
 
 
+
+export const getGetUsersUrl = () => {
+
+
+
+
+  return `/api/users`
+}
+
+/**
+ * @summary List EcoClean users
+ */
+export const getUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<UserAccount[]> => {
+
+  return customFetch<UserAccount[]>(getGetUsersUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUsersQueryKey = () => {
+    return [
+    `/api/users`
+    ] as const;
+    }
+
+
+export const getGetUsersQueryOptions = <TData = Awaited<ReturnType<typeof getUsers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUsersQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUsers>>> = ({ signal }) => getUsers({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUsers>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUsersQueryResult = NonNullable<Awaited<ReturnType<typeof getUsers>>>
+export type GetUsersQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List EcoClean users
+ */
+
+export function useGetUsers<TData = Awaited<ReturnType<typeof getUsers>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUsersQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getInviteUserUrl = () => {
+
+
+
+
+  return `/api/users`
+}
+
+/**
+ * @summary Invite a collaborator to EcoClean
+ */
+export const inviteUser = async (userInput: UserInput, options?: Parameters<typeof customFetch>[1]): Promise<UserAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<UserAccount>(getInviteUserUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(userInput)
+  }
+);}
+
+
+
+
+
+export const getInviteUserMutationKey = () => ['inviteUser'] as const;
+
+export const getInviteUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteUser>>, TError,InviteUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof inviteUser>>, TError,InviteUserMutationVariables, TContext> => {
+
+const mutationKey = getInviteUserMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof inviteUser>>, InviteUserMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  inviteUser(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type InviteUserMutationResult = NonNullable<Awaited<ReturnType<typeof inviteUser>>>
+    export type InviteUserMutationBody = BodyType<UserInput>
+    export type InviteUserMutationError = ErrorType<unknown>
+    export type InviteUserMutationVariables = {data: BodyType<UserInput>}
+
+    /**
+ * @summary Invite a collaborator to EcoClean
+ */
+export const useInviteUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof inviteUser>>, TError,InviteUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof inviteUser>>,
+        TError,
+        InviteUserMutationVariables,
+        TContext
+      > => {
+      return useMutation(getInviteUserMutationOptions(options));
+    }
+
+export const getGetBootstrapStatusUrl = () => {
+
+
+
+
+  return `/api/bootstrap`
+}
+
+/**
+ * @summary Check whether the first administrator can be created
+ */
+export const getBootstrapStatus = async ( options?: Parameters<typeof customFetch>[1]): Promise<BootstrapStatus> => {
+
+  return customFetch<BootstrapStatus>(getGetBootstrapStatusUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetBootstrapStatusQueryKey = () => {
+    return [
+    `/api/bootstrap`
+    ] as const;
+    }
+
+
+export const getGetBootstrapStatusQueryOptions = <TData = Awaited<ReturnType<typeof getBootstrapStatus>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootstrapStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetBootstrapStatusQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getBootstrapStatus>>> = ({ signal }) => getBootstrapStatus({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getBootstrapStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetBootstrapStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getBootstrapStatus>>>
+export type GetBootstrapStatusQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Check whether the first administrator can be created
+ */
+
+export function useGetBootstrapStatus<TData = Awaited<ReturnType<typeof getBootstrapStatus>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getBootstrapStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetBootstrapStatusQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDeleteUserUrl = (id: string,) => {
+
+
+
+
+  return `/api/users/${id}`
+}
+
+/**
+ * @summary Delete a collaborator account
+ */
+export const deleteUser = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteUserUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteUserMutationKey = () => ['deleteUser'] as const;
+
+export const getDeleteUserMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,DeleteUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,DeleteUserMutationVariables, TContext> => {
+
+const mutationKey = getDeleteUserMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUser>>, DeleteUserMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteUser(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUserMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUser>>>
+
+    export type DeleteUserMutationError = ErrorType<unknown>
+    export type DeleteUserMutationVariables = {id: string}
+
+    /**
+ * @summary Delete a collaborator account
+ */
+export const useDeleteUser = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUser>>, TError,DeleteUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUser>>,
+        TError,
+        DeleteUserMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteUserMutationOptions(options));
+    }
 

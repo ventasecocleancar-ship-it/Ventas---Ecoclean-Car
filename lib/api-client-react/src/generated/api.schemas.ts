@@ -139,6 +139,50 @@ export interface AuditEvent {
   severity: AuditEventSeverity;
 }
 
+export type UserRole = typeof UserRole[keyof typeof UserRole];
+
+
+export const UserRole = {
+  ADMIN: 'ADMIN',
+  SUPERVISOR: 'SUPERVISOR',
+  CAJERO: 'CAJERO',
+  OPERADOR: 'OPERADOR',
+} as const;
+
+export type UserStatus = typeof UserStatus[keyof typeof UserStatus];
+
+
+export const UserStatus = {
+  INVITADO: 'INVITADO',
+  ACTIVO: 'ACTIVO',
+  BLOQUEADO: 'BLOQUEADO',
+} as const;
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: UserRole;
+  status: UserStatus;
+  createdAt: string;
+  /** @nullable */
+  invitationId?: string | null;
+}
+
+export interface UserInput {
+  email: string;
+  /** @minLength 1 */
+  firstName: string;
+  /** @minLength 1 */
+  lastName: string;
+  role: UserRole;
+}
+
+export interface BootstrapStatus {
+  allowed: boolean;
+}
+
 export type DashboardCashByMethod = {
   EFECTIVO: number;
   DEBITO: number;

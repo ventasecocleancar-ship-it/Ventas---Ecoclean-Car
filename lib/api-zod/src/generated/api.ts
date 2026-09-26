@@ -341,3 +341,63 @@ export const GetAuditEventsResponseItem = zod.object({
 export const GetAuditEventsResponse = zod.array(GetAuditEventsResponseItem)
 
 
+/**
+ * @summary List EcoClean users
+ */
+export const GetUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "role": zod.enum(['ADMIN', 'SUPERVISOR', 'CAJERO', 'OPERADOR']),
+  "status": zod.enum(['INVITADO', 'ACTIVO', 'BLOQUEADO']),
+  "createdAt": zod.coerce.date(),
+  "invitationId": zod.string().nullish()
+})
+export const GetUsersResponse = zod.array(GetUsersResponseItem)
+
+
+/**
+ * @summary Invite a collaborator to EcoClean
+ */
+
+
+
+
+export const InviteUserBody = zod.object({
+  "email": zod.string().email(),
+  "firstName": zod.string().min(1),
+  "lastName": zod.string().min(1),
+  "role": zod.enum(['ADMIN', 'SUPERVISOR', 'CAJERO', 'OPERADOR'])
+})
+
+export const InviteUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string().email(),
+  "firstName": zod.string(),
+  "lastName": zod.string(),
+  "role": zod.enum(['ADMIN', 'SUPERVISOR', 'CAJERO', 'OPERADOR']),
+  "status": zod.enum(['INVITADO', 'ACTIVO', 'BLOQUEADO']),
+  "createdAt": zod.coerce.date(),
+  "invitationId": zod.string().nullish()
+})
+
+
+/**
+ * @summary Check whether the first administrator can be created
+ */
+export const GetBootstrapStatusResponse = zod.object({
+  "allowed": zod.boolean()
+})
+
+
+/**
+ * @summary Delete a collaborator account
+ */
+export const DeleteUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteUserResponse = zod.void()
+
+

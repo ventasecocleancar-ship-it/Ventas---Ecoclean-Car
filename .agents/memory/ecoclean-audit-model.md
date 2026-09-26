@@ -8,3 +8,9 @@ Orders are operational records, not disposable cart rows: the original order rem
 **Why:** The owner's main goal is to delegate branch operations without losing visibility or allowing sales to disappear from the history.
 
 **How to apply:** Any future order, cash, SII, supervisor, or reporting feature should preserve the original order identity and extend the audit trail instead of overwriting history or adding hard-delete behavior.
+
+Access follows the same separation: the administrator owns user creation and removal, while deleting a person's Clerk access must not delete the operational records or audit events they created.
+
+**Why:** Staff turnover is expected, but the business still needs the complete history of orders and cash actions after a collaborator leaves.
+
+**How to apply:** Use administrator-controlled invitations and role metadata for staff access; keep passwords and authentication lifecycle in Clerk, not in the EcoClean database.

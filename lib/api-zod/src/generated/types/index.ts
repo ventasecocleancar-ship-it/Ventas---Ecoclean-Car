@@ -8,6 +8,7 @@
 
 export * from './auditEvent';
 export * from './auditEventSeverity';
+export * from './bootstrapStatus';
 export * from './dashboard';
 export * from './dashboardCashByMethod';
 export * from './dashboardStatusCounts';
@@ -23,3 +24,7 @@ export * from './paymentInput';
 export * from './paymentMethod';
 export * from './service';
 export * from './serviceInput';
+export * from './userAccount';
+export * from './userInput';
+export * from './userRole';
+export * from './userStatus';
