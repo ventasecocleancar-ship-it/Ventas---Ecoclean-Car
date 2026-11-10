@@ -13,6 +13,8 @@ export interface OrderInput {
   /** @minLength 1 */
   customer: string;
   phone: string;
+  /** @nullable */
+  customerEmail?: string | null;
   /**
      * @minItems 1
      * @items.minimum 1

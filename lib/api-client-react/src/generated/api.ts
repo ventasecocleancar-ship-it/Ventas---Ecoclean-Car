@@ -719,6 +719,83 @@ export const useCreateOrder = <TError = ErrorType<unknown>,
       return useMutation(getCreateOrderMutationOptions(options));
     }
 
+export const getGetOrderByBarcodeUrl = (barcode: string,) => {
+
+
+
+
+  return `/api/orders/barcode/${barcode}`
+}
+
+/**
+ * @summary Find an order by its barcode
+ */
+export const getOrderByBarcode = async (barcode: string, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getGetOrderByBarcodeUrl(barcode),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderByBarcodeQueryKey = (barcode: string,) => {
+    return [
+    `/api/orders/barcode/${barcode}`
+    ] as const;
+    }
+
+
+export const getGetOrderByBarcodeQueryOptions = <TData = Awaited<ReturnType<typeof getOrderByBarcode>>, TError = ErrorType<void>>(barcode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderByBarcode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderByBarcodeQueryKey(barcode);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderByBarcode>>> = ({ signal }) => getOrderByBarcode(barcode, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: barcode !== null && barcode !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderByBarcode>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrderByBarcodeQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderByBarcode>>>
+export type GetOrderByBarcodeQueryError = ErrorType<void>
+
+
+/**
+ * @summary Find an order by its barcode
+ */
+
+export function useGetOrderByBarcode<TData = Awaited<ReturnType<typeof getOrderByBarcode>>, TError = ErrorType<void>>(
+ barcode: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderByBarcode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrderByBarcodeQueryOptions(barcode,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
 export const getGetOrderUrl = (id: number,) => {
 
 
@@ -883,6 +960,157 @@ export const useUpdateOrder = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateOrderMutationOptions(options));
+    }
+
+export const getGetOrderBarcodeImageUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/barcode.png`
+}
+
+/**
+ * @summary Render an order barcode as a PNG image
+ */
+export const getOrderBarcodeImage = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Blob> => {
+
+  return customFetch<Blob>(getGetOrderBarcodeImageUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetOrderBarcodeImageQueryKey = (id: number,) => {
+    return [
+    `/api/orders/${id}/barcode.png`
+    ] as const;
+    }
+
+
+export const getGetOrderBarcodeImageQueryOptions = <TData = Awaited<ReturnType<typeof getOrderBarcodeImage>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderBarcodeImage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetOrderBarcodeImageQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getOrderBarcodeImage>>> = ({ signal }) => getOrderBarcodeImage(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getOrderBarcodeImage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetOrderBarcodeImageQueryResult = NonNullable<Awaited<ReturnType<typeof getOrderBarcodeImage>>>
+export type GetOrderBarcodeImageQueryError = ErrorType<void>
+
+
+/**
+ * @summary Render an order barcode as a PNG image
+ */
+
+export function useGetOrderBarcodeImage<TData = Awaited<ReturnType<typeof getOrderBarcodeImage>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getOrderBarcodeImage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetOrderBarcodeImageQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSendOrderReceiptUrl = (id: number,) => {
+
+
+
+
+  return `/api/orders/${id}/receipt`
+}
+
+/**
+ * @summary Send or retry an order receipt by email
+ */
+export const sendOrderReceipt = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<Order> => {
+
+  return customFetch<Order>(getSendOrderReceiptUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getSendOrderReceiptMutationKey = () => ['sendOrderReceipt'] as const;
+
+export const getSendOrderReceiptMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOrderReceipt>>, TError,SendOrderReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof sendOrderReceipt>>, TError,SendOrderReceiptMutationVariables, TContext> => {
+
+const mutationKey = getSendOrderReceiptMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendOrderReceipt>>, SendOrderReceiptMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  sendOrderReceipt(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SendOrderReceiptMutationResult = NonNullable<Awaited<ReturnType<typeof sendOrderReceipt>>>
+
+    export type SendOrderReceiptMutationError = ErrorType<void>
+    export type SendOrderReceiptMutationVariables = {id: number}
+
+    /**
+ * @summary Send or retry an order receipt by email
+ */
+export const useSendOrderReceipt = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendOrderReceipt>>, TError,SendOrderReceiptMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof sendOrderReceipt>>,
+        TError,
+        SendOrderReceiptMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSendOrderReceiptMutationOptions(options));
     }
 
 export const getUpdateOrderStatusUrl = (id: number,) => {

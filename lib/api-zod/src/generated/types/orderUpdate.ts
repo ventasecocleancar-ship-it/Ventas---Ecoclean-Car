@@ -9,6 +9,8 @@
 export interface OrderUpdate {
   customer?: string;
   phone?: string;
+  /** @nullable */
+  customerEmail?: string | null;
   /**
      * @minimum 0
      * @nullable

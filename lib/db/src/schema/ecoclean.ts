@@ -43,6 +43,9 @@ export const orders = pgTable("ecoclean_orders", {
   plate: text("plate").notNull(),
   customer: text("customer").notNull(),
   phone: text("phone").notNull().default(""),
+  customerEmail: text("customer_email"),
+  receiptEmailStatus: text("receipt_email_status").notNull().default("NO_ENVIADO"),
+  receiptSentAt: timestamp("receipt_sent_at", { withTimezone: true }),
   serviceId: integer("service_id")
     .notNull()
     .references(() => services.id),

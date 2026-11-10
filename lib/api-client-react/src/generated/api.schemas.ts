@@ -84,6 +84,16 @@ export const OrderStatus = {
   ANULADO: 'ANULADO',
 } as const;
 
+export type ReceiptEmailStatus = typeof ReceiptEmailStatus[keyof typeof ReceiptEmailStatus];
+
+
+export const ReceiptEmailStatus = {
+  NO_ENVIADO: 'NO_ENVIADO',
+  ENVIANDO: 'ENVIANDO',
+  ENVIADO: 'ENVIADO',
+  FALLIDO: 'FALLIDO',
+} as const;
+
 export type PaymentMethod = typeof PaymentMethod[keyof typeof PaymentMethod];
 
 
@@ -111,6 +121,11 @@ export interface Order {
   plate: string;
   customer: string;
   phone: string;
+  /** @nullable */
+  customerEmail: string | null;
+  receiptEmailStatus: ReceiptEmailStatus;
+  /** @nullable */
+  receiptSentAt: string | null;
   serviceId: number;
   serviceName: string;
   vehicleSize: VehicleSize;
@@ -132,6 +147,8 @@ export interface OrderInput {
   /** @minLength 1 */
   customer: string;
   phone: string;
+  /** @nullable */
+  customerEmail?: string | null;
   /**
      * @minItems 1
      * @items.minimum 1
@@ -148,6 +165,8 @@ export interface OrderInput {
 export interface OrderUpdate {
   customer?: string;
   phone?: string;
+  /** @nullable */
+  customerEmail?: string | null;
   /**
      * @minimum 0
      * @nullable

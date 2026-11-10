@@ -154,6 +154,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+  /orders/barcode/{barcode}:
+    get:
+      operationId: getOrderByBarcode
+      tags: [orders]
+      summary: Find an order by its barcode
+      parameters:
+        - name: barcode
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching vehicle order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "404":
+          description: No order matches this barcode
   /orders/{id}:
     get:
       operationId: getOrder
@@ -189,6 +209,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+  /orders/{id}/barcode.png:
+    get:
+      operationId: getOrderBarcodeImage
+      tags: [orders]
+      summary: Render an order barcode as a PNG image
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Code 128 barcode image
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Order not found
+  /orders/{id}/receipt:
+    post:
+      operationId: sendOrderReceipt
+      tags: [orders]
+      summary: Send or retry an order receipt by email
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Updated receipt delivery status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Order has no customer email address
+        "404":
+          description: Order not found
   /orders/{id}/status:
     post:
       operationId: updateOrderStatus
@@ -361,18 +416,25 @@ components:
     OrderStatus:
       type: string
       enum: [INGRESADO, EN_SERVICIO, LISTO, PENDIENTE_DE_PAGO, PAGADO, ENTREGADO, ANULADO]
+    ReceiptEmailStatus:
+      type: string
+      enum: [NO_ENVIADO, ENVIANDO, ENVIADO, FALLIDO]
     PaymentMethod:
       type: string
       enum: [EFECTIVO, DEBITO, CREDITO]
     Order:
       type: object
-      required: [id, number, plate, customer, phone, serviceId, serviceName, vehicleSize, price, status, createdAt, updatedAt, enteredBy, lastActionBy, paymentMethod, barcode]
+      required: [id, number, plate, customer, phone, customerEmail, receiptEmailStatus, receiptSentAt, serviceId, serviceName, vehicleSize, price, status, createdAt, updatedAt, enteredBy, lastActionBy, paymentMethod, barcode]
       properties:
         id: { type: integer }
         number: { type: string }
         plate: { type: string }
         customer: { type: string }
         phone: { type: string }
+        customerEmail: { type: ["string", "null"], format: email }
+        receiptEmailStatus:
+          $ref: "#/components/schemas/ReceiptEmailStatus"
+        receiptSentAt: { type: ["string", "null"], format: date-time }
         serviceId: { type: integer }
         serviceName: { type: string }
         vehicleSize:
@@ -395,6 +457,7 @@ components:
         plate: { type: string, minLength: 2 }
         customer: { type: string, minLength: 1 }
         phone: { type: string }
+        customerEmail: { type: ["string", "null"], format: email }
         serviceIds:
           type: array
           minItems: 1
@@ -408,6 +471,7 @@ components:
       properties:
         customer: { type: string }
         phone: { type: string }
+        customerEmail: { type: ["string", "null"], format: email }
         priceOverride: { type: ["integer", "null"], minimum: 0 }
         reason: { type: ["string", "null"] }
     OrderStatusInput:

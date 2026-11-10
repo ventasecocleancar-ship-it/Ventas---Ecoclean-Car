@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
 import {
@@ -12,6 +12,11 @@ import {
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
 import { db } from "@workspace/db";
+import {
+  createOrderBarcodePng,
+  orderBarcode,
+  sendOrderReceipt,
+} from "../lib/order-receipt";
 import {
   auditEvents,
   orders,
@@ -35,6 +40,8 @@ const statuses = [
 const paymentMethods = ["EFECTIVO", "DEBITO", "CREDITO"] as const;
 type PaymentMethod = (typeof paymentMethods)[number];
 type OrderStatus = (typeof statuses)[number];
+const receiptEmailStatuses = ["NO_ENVIADO", "ENVIANDO", "ENVIADO", "FALLIDO"] as const;
+type ReceiptEmailStatus = (typeof receiptEmailStatuses)[number];
 const userRoles = ["ADMIN", "SUPERVISOR", "CAJERO", "OPERADOR"] as const;
 type UserRole = (typeof userRoles)[number];
 const serviceCategories = ["LAVADO", "ADICIONAL", "ESPECIALIZADO", "GENERAL"] as const;
@@ -149,7 +156,7 @@ async function requireAdmin(
 }
 
 function orderNumber(id: number) {
-  return `EC${id.toString().padStart(6, "0")}`;
+  return orderBarcode(id);
 }
 
 function serializeOrder(order: Order) {
@@ -159,6 +166,11 @@ function serializeOrder(order: Order) {
     plate: order.plate,
     customer: order.customer,
     phone: order.phone,
+    customerEmail: order.customerEmail,
+    receiptEmailStatus: (receiptEmailStatuses.includes(order.receiptEmailStatus as ReceiptEmailStatus)
+      ? order.receiptEmailStatus
+      : "NO_ENVIADO") as ReceiptEmailStatus,
+    receiptSentAt: order.receiptSentAt?.toISOString() ?? null,
     serviceId: order.serviceId,
     serviceName: order.serviceName,
     vehicleSize: (vehicleSizes.includes(order.vehicleSize as VehicleSize)
@@ -217,6 +229,61 @@ async function addAudit(
     orderId,
     severity,
   });
+}
+
+async function deliverOrderReceipt(orderId: number, actor: string, req: Request) {
+  const [sending] = await db
+    .update(orders)
+    .set({ receiptEmailStatus: "ENVIANDO", updatedAt: new Date() })
+    .where(and(
+      eq(orders.id, orderId),
+      inArray(orders.receiptEmailStatus, ["NO_ENVIADO", "FALLIDO"]),
+    ))
+    .returning();
+  if (!sending) {
+    const [current] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    return current ?? null;
+  }
+
+  try {
+    await sendOrderReceipt(sending);
+  } catch (error) {
+    req.log.error({ orderId, err: error }, "Order receipt delivery failed");
+    const [failed] = await db
+      .update(orders)
+      .set({
+        receiptEmailStatus: "FALLIDO",
+        receiptSentAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    await addAudit(
+      actor,
+      "COMPROBANTE_FALLIDO",
+      `No se pudo enviar el comprobante de la orden ${orderNumber(orderId)}`,
+      orderId,
+      "WARNING",
+    );
+    return failed ?? null;
+  }
+
+  const [sent] = await db
+    .update(orders)
+    .set({
+      receiptEmailStatus: "ENVIADO",
+      receiptSentAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, orderId))
+    .returning();
+  await addAudit(
+    actor,
+    "COMPROBANTE_ENVIADO",
+    `Comprobante enviado para la orden ${orderNumber(orderId)}`,
+    orderId,
+  );
+  return sent ?? null;
 }
 
 let seedPromise: Promise<void> | null = null;
@@ -411,9 +478,19 @@ router.get("/orders", async (req, res) => {
   const filters = [];
   if (query.status) filters.push(eq(orders.status, query.status));
   if (query.search) {
-    filters.push(
-      sql`(${ilike(orders.plate, `%${query.search}%`)} OR ${ilike(orders.customer, `%${query.search}%`)})`,
-    );
+    const term = `%${query.search.trim()}%`;
+    const searchFilters = [
+      ilike(orders.plate, term),
+      ilike(orders.customer, term),
+      ilike(orders.phone, term),
+      ilike(orders.serviceName, term),
+    ];
+    const barcodeId = query.search.trim().toUpperCase().replace(/[\s-]+/g, "").match(/^EC0*(\d+)$/)?.[1];
+    if (barcodeId) {
+      const id = Number(barcodeId);
+      if (Number.isSafeInteger(id) && id > 0) searchFilters.push(eq(orders.id, id));
+    }
+    filters.push(or(...searchFilters)!);
   }
   const rows = await db
     .select()
@@ -463,6 +540,7 @@ router.post("/orders", async (req, res) => {
       plate: input.plate.trim().toUpperCase(),
       customer: input.customer.trim(),
       phone: input.phone.trim(),
+      customerEmail: input.customerEmail?.trim() || null,
       serviceId: primaryService.id,
       serviceName,
       vehicleSize: input.vehicleSize,
@@ -481,6 +559,9 @@ router.post("/orders", async (req, res) => {
     `Orden ${orderNumber(created.id)} ingresada para ${created.plate} con ${serviceName}; total $${price.toLocaleString("es-CL")}`,
     created.id,
   );
+  const responseOrder = created.customerEmail
+    ? (await deliverOrderReceipt(created.id, actor, req)) ?? created
+    : created;
   if (input.priceOverride !== null && input.priceOverride !== undefined) {
     await addAudit(
       actor,
@@ -490,18 +571,59 @@ router.post("/orders", async (req, res) => {
       "WARNING",
     );
   }
-  res.status(201).json(serializeOrder(created));
+  res.status(201).json(serializeOrder(responseOrder));
+});
+
+router.get("/orders/barcode/:barcode", async (req, res) => {
+  if (!requireActor(req, res)) return;
+  const rawBarcode = Array.isArray(req.params.barcode) ? req.params.barcode[0] : req.params.barcode;
+  const normalized = rawBarcode?.trim().toUpperCase().replace(/[\s-]+/g, "") ?? "";
+  const idText = normalized.match(/^EC0*(\d+)$/)?.[1];
+  const id = Number(idText);
+  if (!idText || !Number.isSafeInteger(id) || id <= 0) {
+    res.status(404).json({ error: "No encontramos una orden con ese código" });
+    return;
+  }
+  const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order || orderNumber(order.id) !== `EC${idText.padStart(6, "0")}`) {
+    res.status(404).json({ error: "No encontramos una orden con ese código" });
+    return;
+  }
+  res.json(serializeOrder(order));
 });
 
 router.get("/orders/:id", async (req, res) => {
   if (!requireActor(req, res)) return;
   const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
   const [order] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
   if (!order) {
     res.status(404).json({ error: "Orden no encontrada" });
     return;
   }
   res.json(serializeOrder(order));
+});
+
+router.get("/orders/:id/barcode.png", async (req, res) => {
+  if (!requireActor(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, id)).limit(1);
+  if (!order) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  const png = await createOrderBarcodePng(orderNumber(id));
+  res
+    .set("Content-Type", "image/png")
+    .set("Cache-Control", "private, max-age=300")
+    .send(png);
 });
 
 router.patch("/orders/:id", async (req, res) => {
@@ -514,11 +636,16 @@ router.patch("/orders/:id", async (req, res) => {
     res.status(404).json({ error: "Orden no encontrada" });
     return;
   }
+  const emailProvided = input.customerEmail !== undefined;
+  const nextEmail = emailProvided ? input.customerEmail?.trim() || null : existing.customerEmail;
+  const emailChanged = emailProvided && nextEmail !== existing.customerEmail;
   const [updated] = await db
     .update(orders)
     .set({
       customer: input.customer ?? existing.customer,
       phone: input.phone ?? existing.phone,
+      customerEmail: nextEmail,
+      ...(emailChanged ? { receiptEmailStatus: "NO_ENVIADO", receiptSentAt: null } : {}),
       price: input.priceOverride ?? existing.price,
       lastActionBy: actor,
       updatedAt: new Date(),
@@ -537,7 +664,43 @@ router.patch("/orders/:id", async (req, res) => {
   if (input.reason) {
     await addAudit(actor, "ORDEN_EDITADA", input.reason, id);
   }
-  res.json(serializeOrder(updated!));
+  const responseOrder = emailChanged && nextEmail
+    ? (await deliverOrderReceipt(id, actor, req)) ?? updated!
+    : updated!;
+  res.json(serializeOrder(responseOrder));
+});
+
+router.post("/orders/:id/receipt", async (req, res) => {
+  const actor = requireActor(req, res);
+  if (!actor) return;
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  const [existing] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  if (!existing.customerEmail) {
+    res.status(400).json({ error: "Agrega el correo del cliente antes de enviar el comprobante" });
+    return;
+  }
+  if (existing.receiptEmailStatus === "ENVIADO") {
+    res.status(409).json({ error: "El comprobante ya fue enviado a este correo" });
+    return;
+  }
+  if (existing.receiptEmailStatus === "ENVIANDO") {
+    res.status(409).json({ error: "El comprobante ya se está enviando" });
+    return;
+  }
+  const updated = await deliverOrderReceipt(id, actor, req);
+  if (!updated) {
+    res.status(500).json({ error: "No se pudo actualizar el estado del comprobante" });
+    return;
+  }
+  res.json(serializeOrder(updated));
 });
 
 router.post("/orders/:id/status", async (req, res) => {

@@ -43,6 +43,9 @@ export const GetDashboardResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
@@ -234,6 +237,9 @@ export const GetOrdersResponseItem = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
@@ -265,6 +271,7 @@ export const CreateOrderBody = zod.object({
   "plate": zod.string().min(createOrderBodyPlateMin),
   "customer": zod.string().min(1),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullish(),
   "serviceIds": zod.array(zod.number().int().min(1)).min(1),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "priceOverride": zod.number().int().min(createOrderBodyPriceOverrideMin).nullish()
@@ -280,10 +287,47 @@ export const CreateOrderResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(createOrderResponsePriceMin),
+  "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "enteredBy": zod.string(),
+  "lastActionBy": zod.string(),
+  "paymentMethod": zod.union([zod.literal('EFECTIVO'),zod.literal('DEBITO'),zod.literal('CREDITO'),zod.literal(null)]).nullable(),
+  "barcode": zod.string()
+})
+
+
+/**
+ * @summary Find an order by its barcode
+ */
+export const GetOrderByBarcodeParams = zod.object({
+  "barcode": zod.coerce.string()
+})
+
+export const getOrderByBarcodeResponsePriceMin = 0;
+
+
+
+export const GetOrderByBarcodeResponse = zod.object({
+  "id": zod.number().int(),
+  "number": zod.string(),
+  "plate": zod.string(),
+  "customer": zod.string(),
+  "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
+  "serviceId": zod.number().int(),
+  "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "price": zod.number().int().min(getOrderByBarcodeResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -311,6 +355,9 @@ export const GetOrderResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
@@ -339,6 +386,7 @@ export const updateOrderBodyPriceOverrideMin = 0;
 export const UpdateOrderBody = zod.object({
   "customer": zod.string().optional(),
   "phone": zod.string().optional(),
+  "customerEmail": zod.string().email().nullish(),
   "priceOverride": zod.number().int().min(updateOrderBodyPriceOverrideMin).nullish(),
   "reason": zod.string().nullish()
 })
@@ -353,10 +401,57 @@ export const UpdateOrderResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(updateOrderResponsePriceMin),
+  "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "enteredBy": zod.string(),
+  "lastActionBy": zod.string(),
+  "paymentMethod": zod.union([zod.literal('EFECTIVO'),zod.literal('DEBITO'),zod.literal('CREDITO'),zod.literal(null)]).nullable(),
+  "barcode": zod.string()
+})
+
+
+/**
+ * @summary Render an order barcode as a PNG image
+ */
+export const GetOrderBarcodeImageParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const GetOrderBarcodeImageResponse = zod.unknown()
+
+
+/**
+ * @summary Send or retry an order receipt by email
+ */
+export const SendOrderReceiptParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const sendOrderReceiptResponsePriceMin = 0;
+
+
+
+export const SendOrderReceiptResponse = zod.object({
+  "id": zod.number().int(),
+  "number": zod.string(),
+  "plate": zod.string(),
+  "customer": zod.string(),
+  "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
+  "serviceId": zod.number().int(),
+  "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "price": zod.number().int().min(sendOrderReceiptResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -389,6 +484,9 @@ export const UpdateOrderStatusResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
@@ -429,6 +527,9 @@ export const RecordPaymentResponse = zod.object({
   "plate": zod.string(),
   "customer": zod.string(),
   "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),

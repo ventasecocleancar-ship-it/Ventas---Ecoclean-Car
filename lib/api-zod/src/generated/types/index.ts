@@ -22,6 +22,7 @@ export * from './orderStatusInput';
 export * from './orderUpdate';
 export * from './paymentInput';
 export * from './paymentMethod';
+export * from './receiptEmailStatus';
 export * from './service';
 export * from './serviceCategory';
 export * from './serviceInput';

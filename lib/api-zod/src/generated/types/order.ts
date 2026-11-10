@@ -7,6 +7,7 @@
  */
 import type { OrderPaymentMethod } from './orderPaymentMethod';
 import type { OrderStatus } from './orderStatus';
+import type { ReceiptEmailStatus } from './receiptEmailStatus';
 import type { VehicleSize } from './vehicleSize';
 
 export interface Order {
@@ -15,6 +16,11 @@ export interface Order {
   plate: string;
   customer: string;
   phone: string;
+  /** @nullable */
+  customerEmail: string | null;
+  receiptEmailStatus: ReceiptEmailStatus;
+  /** @nullable */
+  receiptSentAt: Date | null;
   serviceId: number;
   serviceName: string;
   vehicleSize: VehicleSize;

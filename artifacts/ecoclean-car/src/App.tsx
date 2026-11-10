@@ -7,16 +7,16 @@ import {
   Activity, ArrowLeft, ArrowRight, Bell, Boxes, CarFront, Check, ChevronRight,
   CircleDollarSign, ClipboardCheck, Clock3, Droplets, ExternalLink, FileClock, Filter, Gauge,
   LayoutDashboard, Mail, Menu, MoreHorizontal, PanelLeft, Pencil, Plus, Printer, ReceiptText,
-  RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, WalletCards, X,
+  RefreshCw, ScanLine, Search, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, WalletCards, X,
 } from 'lucide-react';
 import { Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
   AuditEventSeverity, OrderStatus, PaymentMethod, ServiceCategory, VehicleSize,
   type AuditEvent, type Dashboard, type Order, type Service,
-  getGetAuditEventsQueryKey, getGetDashboardQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey,
+  getGetAuditEventsQueryKey, getGetDashboardQueryKey, getGetOrderByBarcodeQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey,
   getGetBootstrapStatusQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteService, useDeleteUser,
   useGetAuditEvents, useGetBootstrapStatus, useGetDashboard, useGetOrder, useGetOrders, useGetServices, useGetUsers,
-  useInviteUser, useRecordPayment, useUpdateOrder, useUpdateOrderStatus,
+  useGetOrderByBarcode, useInviteUser, useRecordPayment, useSendOrderReceipt, useUpdateOrder, useUpdateOrderStatus,
   useUpdateService, type UserAccount, UserRole,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -83,9 +83,9 @@ const clerkAppearance = {
 };
 
 const statusMeta: Record<string, { label: string; tone: string; dot: string }> = {
-  INGRESADO: { label: 'Ingresado', tone: 'bg-[#e4efe9] text-[#256b55]', dot: 'bg-[#3d9579]' },
-  EN_SERVICIO: { label: 'En servicio', tone: 'bg-[#fff0c9] text-[#906d19]', dot: 'bg-[#d19d2f]' },
-  LISTO: { label: 'Listo', tone: 'bg-[#dcecf3] text-[#21627a]', dot: 'bg-[#4289a3]' },
+  INGRESADO: { label: 'Entrada', tone: 'bg-[#e4efe9] text-[#256b55]', dot: 'bg-[#3d9579]' },
+  EN_SERVICIO: { label: 'En puente', tone: 'bg-[#fff0c9] text-[#906d19]', dot: 'bg-[#d19d2f]' },
+  LISTO: { label: 'Servicio finalizado', tone: 'bg-[#dcecf3] text-[#21627a]', dot: 'bg-[#4289a3]' },
   PENDIENTE_DE_PAGO: { label: 'Pendiente de pago', tone: 'bg-[#fbe5d9] text-[#a64a30]', dot: 'bg-[#d26445]' },
   PAGADO: { label: 'Pagado', tone: 'bg-[#dfeee0] text-[#397044]', dot: 'bg-[#5d9e60]' },
   ENTREGADO: { label: 'Entregado', tone: 'bg-[#eee8df] text-[#71675a]', dot: 'bg-[#948575]' },
@@ -105,10 +105,10 @@ const demoServices: Service[] = [
   { id: 3, name: 'Detalle premium', description: 'Terminación fina, llantas y protección.', category: ServiceCategory.ESPECIALIZADO, price: 24900, priceSmall: 24900, priceMedium: 24900, priceLarge: 24900, active: true },
 ];
 const demoOrders: Order[] = [
-  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', serviceId: 2, serviceName: 'Interior + exterior', vehicleSize: VehicleSize.MEDIANO, price: 14900, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
-  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
-  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', serviceId: 3, serviceName: 'Detalle premium', vehicleSize: VehicleSize.MEDIANO, price: 24900, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
-  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
+  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 2, serviceName: 'Interior + exterior', vehicleSize: VehicleSize.MEDIANO, price: 14900, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
+  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
+  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 3, serviceName: 'Detalle premium', vehicleSize: VehicleSize.MEDIANO, price: 24900, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
+  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
 ];
 const demoAudit: AuditEvent[] = [
   { id: 1, action: 'ORDER_STATUS_CHANGED', description: 'EC-1048 pasó a Pendiente de pago', actor: 'Diego M.', timestamp: new Date(Date.now() - 8 * 60000).toISOString(), severity: AuditEventSeverity.INFO },
@@ -256,11 +256,71 @@ function ActivityPanel({ events }: { events: AuditEvent[] }) { return <Card clas
 function PageSkeleton() { return <div className="animate-pulse space-y-5"><div className="h-12 w-64 rounded-xl bg-[#e1e4da]" /><div className="grid gap-4 sm:grid-cols-4">{[1, 2, 3, 4].map(i => <div key={i} className="h-32 rounded-2xl bg-[#e1e4da]" />)}</div><div className="h-72 rounded-2xl bg-[#e1e4da]" /></div>; }
 
 function OrdersPage() {
+  const [, setLocation] = useLocation();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [scannerInput, setScannerInput] = useState('');
+  const [scanRequest, setScanRequest] = useState({ value: '', attempt: 0 });
+  const [scanError, setScanError] = useState('');
   const query = useGetOrders({ search: search || undefined, status: (status || undefined) as typeof OrderStatus[keyof typeof OrderStatus] | undefined }, { query: { queryKey: getGetOrdersQueryKey({ search: search || undefined, status: (status || undefined) as typeof OrderStatus[keyof typeof OrderStatus] | undefined }), retry: false } });
+  const scanQuery = useGetOrderByBarcode(scanRequest.value, { query: { queryKey: [...getGetOrderByBarcodeQueryKey(scanRequest.value), scanRequest.attempt], enabled: Boolean(scanRequest.value), retry: false } });
   const orders = query.data ?? (query.isError ? demoOrders : []);
-  return <div className="page-in"><PageTitle eyebrow="Flujo de vehículos" title="Órdenes" description="Mueve cada auto con claridad, desde el ingreso hasta la entrega." action={<Button asChild data-testid="button-orders-new" className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><Link href="/orders/new"><Plus size={17} /> Nueva orden</Link></Button>} />{query.isError && <PreviewNotice />}<Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardContent className="p-4"><div className="flex flex-col gap-3 lg:flex-row"><div className="relative flex-1"><Search size={17} className="absolute left-3 top-3 text-[#789087]" /><Input data-testid="input-orders-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por patente, cliente o número…" className="h-10 border-[#d7ded5] bg-[#fbf8ef] pl-10" /></div><div className="flex gap-2 overflow-x-auto">{['', 'INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'ENTREGADO'].map(filter => <button key={filter || 'all'} type="button" data-testid={`button-filter-${filter || 'all'}`} onClick={() => setStatus(filter)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${status === filter ? 'border-[#1e6b58] bg-[#1e6b58] text-white' : 'border-[#d7ded5] text-[#668279] hover:bg-[#eef5ef]'}`}>{filter ? statusMeta[filter]?.label : 'Todas'}</button>)}</div></div></CardContent></Card><div className="mt-4 overflow-hidden rounded-2xl border border-[#dfe2d8] bg-[#faf8f0]"><div className="hidden grid-cols-[1.15fr_1.3fr_1fr_.75fr_1fr_24px] gap-4 border-b border-[#e7e8df] px-5 py-3 text-[10px] font-bold uppercase tracking-[.12em] text-[#8aa097] md:grid"><span>Orden</span><span>Cliente</span><span>Servicio</span><span>Precio</span><span>Estado</span><span /></div>{orders.map(order => <Link href={`/orders/${order.id}`} key={order.id} data-testid={`row-order-${order.id}`} className="grid gap-3 border-b border-[#e7e8df] px-5 py-4 transition-colors last:border-0 hover:bg-[#f4f5ed] md:grid-cols-[1.15fr_1.3fr_1fr_.75fr_1fr_24px] md:items-center md:gap-4"><div><div className="flex items-center gap-2"><span className="mono text-xs font-bold text-[#285c4d]">{order.number}</span><span className="mono rounded bg-[#eee9de] px-1.5 py-0.5 text-[10px] text-[#75877e]">{order.plate}</span></div><p className="mt-1 text-[11px] text-[#8aa097]">{shortDate(order.createdAt)}</p></div><div><p className="text-sm font-bold text-[#355d50]">{order.customer}</p><p className="mt-1 text-xs text-[#8aa097]">{order.phone}</p></div><div className="text-xs text-[#668279]">{order.serviceName}</div><div className="text-sm font-bold text-[#285c4d]">{money(order.price)}</div><div><StatusBadge status={order.status} /></div><ChevronRight size={16} className="hidden text-[#a5b4ac] md:block" /></Link>)}{!orders.length && <div className="p-14 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e4efe9] text-[#2f9274]"><Search /></div><h3 className="mt-4 font-bold text-[#285c4d]">No encontramos órdenes</h3><p className="mt-1 text-sm text-[#789087]">Prueba con otra búsqueda o limpia el filtro.</p><button type="button" data-testid="button-clear-order-filters" onClick={() => { setSearch(''); setStatus(''); }} className="mt-4 text-xs font-bold text-[#2f9274]">Limpiar filtros</button></div>}</div></div>;
+  useEffect(() => {
+    if (scanRequest.value && scanQuery.data) setLocation(`/orders/${scanQuery.data.id}`);
+  }, [scanRequest.value, scanQuery.data, setLocation]);
+  useEffect(() => {
+    if (scanRequest.value && scanQuery.isError && !scanQuery.isFetching) {
+      setScanError('No encontramos una orden con ese código. Intenta escanearlo otra vez.');
+    }
+  }, [scanRequest.value, scanQuery.isError, scanQuery.isFetching]);
+  const submitScan = (event: FormEvent) => {
+    event.preventDefault();
+    const value = scannerInput.trim().toUpperCase();
+    if (!value) {
+      setScanError('Escanea o ingresa el código del comprobante.');
+      return;
+    }
+    setScanError('');
+    setScanRequest(current => ({ value, attempt: current.attempt + 1 }));
+  };
+  return <div className="page-in">
+    <PageTitle eyebrow="Flujo de vehículos" title="Órdenes" description="Sigue cada vehículo desde la entrada hasta la entrega." action={<Button asChild data-testid="button-orders-new" className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><Link href="/orders/new"><Plus size={17} /> Nueva orden</Link></Button>} />
+    {query.isError && <PreviewNotice />}
+    <Card className="mb-4 border-[#dfe2d8] bg-[#faf8f0]">
+      <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e4efe9] text-[#2f9274]"><ScanLine size={21} /></div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-bold text-[#285c4d]">Buscar una orden con el código del cliente</h2>
+          <p className="mt-1 text-xs text-[#789087]">Escanea el código de barras del teléfono; la orden se abrirá para revisar el servicio y registrar el pago.</p>
+        </div>
+        <form onSubmit={submitScan} className="flex w-full gap-2 sm:max-w-md">
+          <Input autoFocus data-testid="input-scan-order-barcode" value={scannerInput} onChange={event => setScannerInput(event.target.value)} placeholder="Escanea o escribe el código" className="h-10 min-w-0 flex-1 border-[#d7ded5] bg-[#fbf8ef]" aria-label="Código de barras de la orden" />
+          <Button type="submit" data-testid="button-scan-order" disabled={scanQuery.isFetching} className="h-10 rounded-xl bg-[#1e6b58] font-bold text-white">{scanQuery.isFetching ? 'Buscando…' : 'Buscar'}</Button>
+        </form>
+      </CardContent>
+      {scanError && <p data-testid="status-scan-error" className="px-5 pb-4 text-xs font-semibold text-[#a64a30]">{scanError}</p>}
+    </Card>
+    <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-3 lg:flex-row">
+          <div className="relative flex-1"><Search size={17} className="absolute left-3 top-3 text-[#789087]" /><Input data-testid="input-orders-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar por patente, cliente, teléfono o servicio…" className="h-10 border-[#d7ded5] bg-[#fbf8ef] pl-10" /></div>
+          <div className="flex gap-2 overflow-x-auto">{['', 'INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'ENTREGADO'].map(filter => <button key={filter || 'all'} type="button" data-testid={`button-filter-${filter || 'all'}`} onClick={() => setStatus(filter)} className={`whitespace-nowrap rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${status === filter ? 'border-[#1e6b58] bg-[#1e6b58] text-white' : 'border-[#d7ded5] text-[#668279] hover:bg-[#eef5ef]'}`}>{filter ? statusMeta[filter]?.label : 'Todas'}</button>)}</div>
+        </div>
+      </CardContent>
+    </Card>
+    <div className="mt-4 overflow-hidden rounded-2xl border border-[#dfe2d8] bg-[#faf8f0]">
+      <div className="hidden grid-cols-[1.15fr_1.3fr_1fr_.75fr_1fr_24px] gap-4 border-b border-[#e7e8df] px-5 py-3 text-[10px] font-bold uppercase tracking-[.12em] text-[#8aa097] md:grid"><span>Orden</span><span>Cliente</span><span>Servicio</span><span>Precio</span><span>Estado</span><span /></div>
+      {orders.map(order => <Link href={`/orders/${order.id}`} key={order.id} data-testid={`row-order-${order.id}`} className="grid gap-3 border-b border-[#e7e8df] px-5 py-4 transition-colors last:border-0 hover:bg-[#f4f5ed] md:grid-cols-[1.15fr_1.3fr_1fr_.75fr_1fr_24px] md:items-center md:gap-4">
+        <div><div className="flex items-center gap-2"><span className="mono text-xs font-bold text-[#285c4d]">{order.number}</span><span className="mono rounded bg-[#eee9de] px-1.5 py-0.5 text-[10px] text-[#75877e]">{order.plate}</span></div><p className="mt-1 text-[11px] text-[#8aa097]">{shortDate(order.createdAt)}</p></div>
+        <div><p className="text-sm font-bold text-[#355d50]">{order.customer}</p><p className="mt-1 text-xs text-[#8aa097]">{order.phone}</p></div>
+        <div className="text-xs text-[#668279]">{order.serviceName}</div>
+        <div className="text-sm font-bold text-[#285c4d]">{money(order.price)}</div>
+        <div><StatusBadge status={order.status} /></div>
+        <ChevronRight size={16} className="hidden text-[#a5b4ac] md:block" />
+      </Link>)}
+      {!orders.length && <div className="p-14 text-center"><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#e4efe9] text-[#2f9274]"><Search /></div><h3 className="mt-4 font-bold text-[#285c4d]">No encontramos órdenes</h3><p className="mt-1 text-sm text-[#789087]">Prueba con otra búsqueda o limpia el filtro.</p><button type="button" data-testid="button-clear-order-filters" onClick={() => { setSearch(''); setStatus(''); }} className="mt-4 text-xs font-bold text-[#2f9274]">Limpiar filtros</button></div>}
+    </div>
+  </div>;
 }
 
 function NewOrderPage() {
@@ -269,12 +329,21 @@ function NewOrderPage() {
   const services = servicesQuery.data ?? demoServices;
   const activeServices = services.filter(service => service.active);
   const create = useCreateOrder();
-  const [form, setForm] = useState({ plate: '', customer: '', phone: '', priceOverride: '' });
+  const [form, setForm] = useState({ plate: '', customer: '', phone: '', email: '', priceOverride: '' });
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [vehicleSize, setVehicleSize] = useState<typeof VehicleSize[keyof typeof VehicleSize]>(VehicleSize.MEDIANO);
   const [initialServiceSelected, setInitialServiceSelected] = useState(false);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [error, setError] = useState('');
   const update = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }));
+  const searchTerm = serviceSearch.trim().toLocaleLowerCase('es-CL').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const visibleServices = activeServices.filter(service => {
+    const content = `${service.name} ${service.description} ${serviceCategoryLabel(service.category)}`
+      .toLocaleLowerCase('es-CL')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    return content.includes(searchTerm);
+  });
   useEffect(() => {
     if (!servicesQuery.isLoading && !initialServiceSelected) {
       const firstWash = activeServices.find(service => service.category === ServiceCategory.LAVADO) ?? activeServices[0];
@@ -303,6 +372,7 @@ function NewOrderPage() {
         plate: form.plate.toUpperCase(),
         customer: form.customer,
         phone: form.phone,
+        customerEmail: form.email.trim() || null,
         serviceIds: selectedServices.map(service => service.id),
         vehicleSize,
         priceOverride: form.priceOverride ? Number(form.priceOverride) : null,
@@ -328,6 +398,7 @@ function NewOrderPage() {
             <div><Label htmlFor="customer">Nombre cliente</Label><Input id="customer" data-testid="input-order-customer" value={form.customer} onChange={e => update('customer', e.target.value)} placeholder="Nombre y apellido" className="mt-2 h-11 bg-[#fbf8ef]" required /></div>
           </div>
           <div><Label htmlFor="phone">Teléfono</Label><Input id="phone" data-testid="input-order-phone" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+56 9 0000 0000" className="mt-2 h-11 bg-[#fbf8ef]" required /></div>
+          <div><Label htmlFor="customer-email">Gmail o correo <span className="font-normal text-[#8aa097]">(opcional)</span></Label><Input id="customer-email" data-testid="input-order-email" type="email" value={form.email} onChange={e => update('email', e.target.value)} placeholder="cliente@gmail.com" className="mt-2 h-11 bg-[#fbf8ef]" /><p className="mt-1 text-[10px] text-[#789087]">Enviaremos el comprobante con código de barras al registrar la orden.</p></div>
           <div><Label htmlFor="notes">Nota de ingreso <span className="font-normal text-[#8aa097]">(opcional, solo para el equipo)</span></Label><Textarea id="notes" data-testid="input-order-notes" placeholder="Ej. revisar rayón en puerta trasera…" className="mt-2 min-h-24 resize-none bg-[#fbf8ef]" /></div>
         </CardContent>
       </Card>
@@ -346,8 +417,13 @@ function NewOrderPage() {
           </fieldset>
           <fieldset className="space-y-2">
             <legend className="mb-2 text-xs font-bold text-[#355d50]">Servicios disponibles</legend>
+            <div className="relative mb-3">
+              <Search size={16} className="absolute left-3 top-3 text-[#789087]" />
+              <Input id="order-service-search" data-testid="input-order-service-search" type="search" value={serviceSearch} onChange={event => setServiceSearch(event.target.value)} placeholder="Buscar servicio por nombre…" className="h-10 border-[#d7ded5] bg-[#fbf8ef] pl-10" />
+              {serviceSearch && <button type="button" data-testid="button-clear-service-search" onClick={() => setServiceSearch('')} className="absolute right-3 top-2.5 text-[11px] font-semibold text-[#2f9274]">Limpiar</button>}
+            </div>
             {[ServiceCategory.LAVADO, ServiceCategory.ADICIONAL, ServiceCategory.ESPECIALIZADO, ServiceCategory.GENERAL].map(category => {
-              const group = activeServices.filter(service => service.category === category);
+              const group = visibleServices.filter(service => service.category === category);
               if (!group.length) return null;
               return <div key={category} className="space-y-2">
                 <h3 className="pt-2 text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">{serviceCategoryLabel(category)}</h3>
@@ -363,6 +439,7 @@ function NewOrderPage() {
                 })}
               </div>;
             })}
+            {!visibleServices.length && <p data-testid="text-no-services-found" className="rounded-xl border border-dashed border-[#cbd9cf] p-5 text-center text-xs text-[#789087]">No encontramos servicios con ese nombre.</p>}
           </fieldset>
           <div className="rounded-xl border border-[#d8e5db] bg-[#eaf3ec] p-4">
             <div className="mb-3 flex items-center justify-between"><p className="text-xs font-bold text-[#355d50]">Resumen</p><span className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-semibold text-[#668279]">{selectedServices.length} {selectedServices.length === 1 ? 'servicio' : 'servicios'}</span></div>
