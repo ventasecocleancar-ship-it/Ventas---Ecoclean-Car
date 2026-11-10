@@ -30,7 +30,11 @@ export const services = pgTable("ecoclean_services", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  category: text("category").notNull().default("GENERAL"),
   price: integer("price").notNull(),
+  priceSmall: integer("price_small"),
+  priceMedium: integer("price_medium"),
+  priceLarge: integer("price_large"),
   active: boolean("active").notNull().default(true),
 });
 
@@ -43,6 +47,7 @@ export const orders = pgTable("ecoclean_orders", {
     .notNull()
     .references(() => services.id),
   serviceName: text("service_name").notNull(),
+  vehicleSize: text("vehicle_size").notNull().default("MEDIANO"),
   price: integer("price").notNull(),
   status: orderStatusEnum("status").notNull().default("INGRESADO"),
   paymentMethod: paymentMethodEnum("payment_method"),

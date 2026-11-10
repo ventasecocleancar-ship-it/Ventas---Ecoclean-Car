@@ -35,6 +35,7 @@ Software de ventas, operación y control de caja para una empresa de lavado de a
 - User lifecycle is administrator-controlled: the first Clerk account bootstraps as `ADMIN`, collaborators are invited with a role, and deleting access never deletes operational history.
 - Development preview supports an explicitly labeled demo path so the owner can review the portal before inviting the supervisor.
 - Prices are copied onto each order at intake, preserving the historical sale value even if the service catalog changes later.
+- Services have separate prices for small, medium, and large vehicles; removing a service pauses it for future orders without deleting it or changing past orders.
 - SII readiness is represented in the settings surface, while live electronic document emission remains a separate integration step.
 
 ## Product

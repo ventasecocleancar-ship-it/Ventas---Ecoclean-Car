@@ -45,6 +45,7 @@ export const GetDashboardResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(getDashboardResponseRecentOrdersItemPriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -66,9 +67,15 @@ export const GetDashboardResponse = zod.object({
 
 
 /**
- * @summary List active wash services
+ * @summary List catalog services including paused entries
  */
 export const getServicesResponsePriceMin = 0;
+
+export const getServicesResponsePriceSmallMin = 0;
+
+export const getServicesResponsePriceMediumMin = 0;
+
+export const getServicesResponsePriceLargeMin = 0;
 
 
 
@@ -76,7 +83,11 @@ export const GetServicesResponseItem = zod.object({
   "id": zod.number().int(),
   "name": zod.string(),
   "description": zod.string(),
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']),
   "price": zod.number().int().min(getServicesResponsePriceMin),
+  "priceSmall": zod.number().int().min(getServicesResponsePriceSmallMin),
+  "priceMedium": zod.number().int().min(getServicesResponsePriceMediumMin),
+  "priceLarge": zod.number().int().min(getServicesResponsePriceLargeMin),
   "active": zod.boolean()
 })
 export const GetServicesResponse = zod.array(GetServicesResponseItem)
@@ -86,17 +97,30 @@ export const GetServicesResponse = zod.array(GetServicesResponseItem)
  * @summary Add a wash service
  */
 
-export const createServiceBodyPriceMin = 0;
+export const createServiceBodyPriceSmallMin = 0;
+
+export const createServiceBodyPriceMediumMin = 0;
+
+export const createServiceBodyPriceLargeMin = 0;
 
 
 
 export const CreateServiceBody = zod.object({
   "name": zod.string().min(1),
   "description": zod.string(),
-  "price": zod.number().int().min(createServiceBodyPriceMin)
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']),
+  "priceSmall": zod.number().int().min(createServiceBodyPriceSmallMin),
+  "priceMedium": zod.number().int().min(createServiceBodyPriceMediumMin),
+  "priceLarge": zod.number().int().min(createServiceBodyPriceLargeMin)
 })
 
 export const createServiceResponsePriceMin = 0;
+
+export const createServiceResponsePriceSmallMin = 0;
+
+export const createServiceResponsePriceMediumMin = 0;
+
+export const createServiceResponsePriceLargeMin = 0;
 
 
 
@@ -104,7 +128,90 @@ export const CreateServiceResponse = zod.object({
   "id": zod.number().int(),
   "name": zod.string(),
   "description": zod.string(),
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']),
   "price": zod.number().int().min(createServiceResponsePriceMin),
+  "priceSmall": zod.number().int().min(createServiceResponsePriceSmallMin),
+  "priceMedium": zod.number().int().min(createServiceResponsePriceMediumMin),
+  "priceLarge": zod.number().int().min(createServiceResponsePriceLargeMin),
+  "active": zod.boolean()
+})
+
+
+/**
+ * @summary Edit a catalog service
+ */
+export const UpdateServiceParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+
+export const updateServiceBodyPriceSmallMin = 0;
+
+export const updateServiceBodyPriceMediumMin = 0;
+
+export const updateServiceBodyPriceLargeMin = 0;
+
+
+
+export const UpdateServiceBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "description": zod.string().optional(),
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']).optional(),
+  "priceSmall": zod.number().int().min(updateServiceBodyPriceSmallMin).optional(),
+  "priceMedium": zod.number().int().min(updateServiceBodyPriceMediumMin).optional(),
+  "priceLarge": zod.number().int().min(updateServiceBodyPriceLargeMin).optional(),
+  "active": zod.boolean().optional()
+})
+
+export const updateServiceResponsePriceMin = 0;
+
+export const updateServiceResponsePriceSmallMin = 0;
+
+export const updateServiceResponsePriceMediumMin = 0;
+
+export const updateServiceResponsePriceLargeMin = 0;
+
+
+
+export const UpdateServiceResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']),
+  "price": zod.number().int().min(updateServiceResponsePriceMin),
+  "priceSmall": zod.number().int().min(updateServiceResponsePriceSmallMin),
+  "priceMedium": zod.number().int().min(updateServiceResponsePriceMediumMin),
+  "priceLarge": zod.number().int().min(updateServiceResponsePriceLargeMin),
+  "active": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a service from the active catalog
+ */
+export const DeleteServiceParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const deleteServiceResponsePriceMin = 0;
+
+export const deleteServiceResponsePriceSmallMin = 0;
+
+export const deleteServiceResponsePriceMediumMin = 0;
+
+export const deleteServiceResponsePriceLargeMin = 0;
+
+
+
+export const DeleteServiceResponse = zod.object({
+  "id": zod.number().int(),
+  "name": zod.string(),
+  "description": zod.string(),
+  "category": zod.enum(['LAVADO', 'ADICIONAL', 'ESPECIALIZADO', 'GENERAL']),
+  "price": zod.number().int().min(deleteServiceResponsePriceMin),
+  "priceSmall": zod.number().int().min(deleteServiceResponsePriceSmallMin),
+  "priceMedium": zod.number().int().min(deleteServiceResponsePriceMediumMin),
+  "priceLarge": zod.number().int().min(deleteServiceResponsePriceLargeMin),
   "active": zod.boolean()
 })
 
@@ -129,6 +236,7 @@ export const GetOrdersResponseItem = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(getOrdersResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -158,6 +266,7 @@ export const CreateOrderBody = zod.object({
   "customer": zod.string().min(1),
   "phone": zod.string(),
   "serviceIds": zod.array(zod.number().int().min(1)).min(1),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "priceOverride": zod.number().int().min(createOrderBodyPriceOverrideMin).nullish()
 })
 
@@ -173,6 +282,7 @@ export const CreateOrderResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(createOrderResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -203,6 +313,7 @@ export const GetOrderResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(getOrderResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -244,6 +355,7 @@ export const UpdateOrderResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(updateOrderResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -279,6 +391,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(updateOrderStatusResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
@@ -318,6 +431,7 @@ export const RecordPaymentResponse = zod.object({
   "phone": zod.string(),
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
   "price": zod.number().int().min(recordPaymentResponsePriceMin),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),

@@ -20,3 +20,9 @@ Order creation supports selecting multiple catalog services while retaining the 
 **Why:** The requested workflow needs one order with a correct combined price, and adding a line-item table is unnecessary schema work until item-level operations are required.
 
 **How to apply:** Keep price calculation server-owned and preserve existing order history; expand to a normalized line-item model only when downstream features need per-service data.
+
+The service catalog can have separate prices for small, medium, and large vehicles. An order stores its vehicle size and final total; editing or pausing a service must never reprice an existing order.
+
+**Why:** Catalog prices change over time, and the order's accepted amount is the durable record of what the customer agreed to pay.
+
+**How to apply:** Recalculate new orders from current server-side catalog prices, but keep edits and soft-removals confined to future orders.

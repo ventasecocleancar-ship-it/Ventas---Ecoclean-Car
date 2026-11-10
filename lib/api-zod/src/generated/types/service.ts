@@ -5,12 +5,20 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ServiceCategory } from './serviceCategory';
 
 export interface Service {
   id: number;
   name: string;
   description: string;
+  category: ServiceCategory;
   /** @minimum 0 */
   price: number;
+  /** @minimum 0 */
+  priceSmall: number;
+  /** @minimum 0 */
+  priceMedium: number;
+  /** @minimum 0 */
+  priceLarge: number;
   active: boolean;
 }

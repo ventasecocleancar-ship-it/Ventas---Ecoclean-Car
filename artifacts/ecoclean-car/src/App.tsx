@@ -6,18 +6,18 @@ import { shadcn } from '@clerk/themes';
 import {
   Activity, ArrowLeft, ArrowRight, Bell, Boxes, CarFront, Check, ChevronRight,
   CircleDollarSign, ClipboardCheck, Clock3, Droplets, ExternalLink, FileClock, Filter, Gauge,
-  LayoutDashboard, Mail, Menu, MoreHorizontal, PanelLeft, Plus, Printer, ReceiptText,
+  LayoutDashboard, Mail, Menu, MoreHorizontal, PanelLeft, Pencil, Plus, Printer, ReceiptText,
   RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Trash2, UserPlus, WalletCards, X,
 } from 'lucide-react';
 import { Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
-  AuditEventSeverity, OrderStatus, PaymentMethod,
+  AuditEventSeverity, OrderStatus, PaymentMethod, ServiceCategory, VehicleSize,
   type AuditEvent, type Dashboard, type Order, type Service,
   getGetAuditEventsQueryKey, getGetDashboardQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey,
-  getGetBootstrapStatusQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteUser,
+  getGetBootstrapStatusQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteService, useDeleteUser,
   useGetAuditEvents, useGetBootstrapStatus, useGetDashboard, useGetOrder, useGetOrders, useGetServices, useGetUsers,
   useInviteUser, useRecordPayment, useUpdateOrder, useUpdateOrderStatus,
-  type UserAccount, UserRole,
+  useUpdateService, type UserAccount, UserRole,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Button } from '@/components/ui/button';
@@ -93,19 +93,22 @@ const statusMeta: Record<string, { label: string; tone: string; dot: string }> =
 };
 const statusOrder = [OrderStatus.INGRESADO, OrderStatus.EN_SERVICIO, OrderStatus.LISTO, OrderStatus.PENDIENTE_DE_PAGO, OrderStatus.PAGADO, OrderStatus.ENTREGADO];
 const money = (value = 0) => new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(value);
+const servicePrice = (service: Service, size: typeof VehicleSize[keyof typeof VehicleSize]) => size === VehicleSize.PEQUENO ? service.priceSmall : size === VehicleSize.GRANDE ? service.priceLarge : service.priceMedium;
+const serviceCategoryLabel = (category: string) => category === ServiceCategory.LAVADO ? 'Lavados' : category === ServiceCategory.ADICIONAL ? 'Adicionales' : category === ServiceCategory.ESPECIALIZADO ? 'Especializados' : 'Otros servicios';
+const vehicleSizeLabel = (size: string) => size === VehicleSize.PEQUENO ? 'Pequeño' : size === VehicleSize.GRANDE ? 'Grande' : 'Mediano';
 const shortDate = (value: string) => new Intl.DateTimeFormat('es-CL', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(value));
 const todayLabel = new Intl.DateTimeFormat('es-CL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 
 const demoServices: Service[] = [
-  { id: 1, name: 'Lavado eco exterior', description: 'Lavado de bajo consumo con secado manual.', price: 8900, active: true },
-  { id: 2, name: 'Interior + exterior', description: 'Limpieza profunda para volver a estrenar.', price: 14900, active: true },
-  { id: 3, name: 'Detalle premium', description: 'Terminación fina, llantas y protección.', price: 24900, active: true },
+  { id: 1, name: 'Lavado eco exterior', description: 'Lavado de bajo consumo con secado manual.', category: ServiceCategory.LAVADO, price: 8900, priceSmall: 8900, priceMedium: 8900, priceLarge: 8900, active: true },
+  { id: 2, name: 'Interior + exterior', description: 'Limpieza profunda para volver a estrenar.', category: ServiceCategory.LAVADO, price: 14900, priceSmall: 14900, priceMedium: 14900, priceLarge: 14900, active: true },
+  { id: 3, name: 'Detalle premium', description: 'Terminación fina, llantas y protección.', category: ServiceCategory.ESPECIALIZADO, price: 24900, priceSmall: 24900, priceMedium: 24900, priceLarge: 24900, active: true },
 ];
 const demoOrders: Order[] = [
-  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', serviceId: 2, serviceName: 'Interior + exterior', price: 14900, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
-  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', serviceId: 1, serviceName: 'Lavado eco exterior', price: 8900, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
-  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', serviceId: 3, serviceName: 'Detalle premium', price: 24900, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
-  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', serviceId: 1, serviceName: 'Lavado eco exterior', price: 8900, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
+  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', serviceId: 2, serviceName: 'Interior + exterior', vehicleSize: VehicleSize.MEDIANO, price: 14900, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
+  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
+  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', serviceId: 3, serviceName: 'Detalle premium', vehicleSize: VehicleSize.MEDIANO, price: 24900, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
+  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
 ];
 const demoAudit: AuditEvent[] = [
   { id: 1, action: 'ORDER_STATUS_CHANGED', description: 'EC-1048 pasó a Pendiente de pago', actor: 'Diego M.', timestamp: new Date(Date.now() - 8 * 60000).toISOString(), severity: AuditEventSeverity.INFO },
@@ -264,20 +267,25 @@ function NewOrderPage() {
   const [, setLocation] = useLocation();
   const servicesQuery = useGetServices({ query: { queryKey: getGetServicesQueryKey(), retry: false } });
   const services = servicesQuery.data ?? demoServices;
+  const activeServices = services.filter(service => service.active);
   const create = useCreateOrder();
   const [form, setForm] = useState({ plate: '', customer: '', phone: '', priceOverride: '' });
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
+  const [vehicleSize, setVehicleSize] = useState<typeof VehicleSize[keyof typeof VehicleSize]>(VehicleSize.MEDIANO);
+  const [initialServiceSelected, setInitialServiceSelected] = useState(false);
   const [error, setError] = useState('');
   const update = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }));
   useEffect(() => {
-    if (!servicesQuery.isLoading && selectedServiceIds.length === 0 && services.length > 0) {
-      setSelectedServiceIds([services[0].id]);
+    if (!servicesQuery.isLoading && !initialServiceSelected) {
+      const firstWash = activeServices.find(service => service.category === ServiceCategory.LAVADO) ?? activeServices[0];
+      if (firstWash) setSelectedServiceIds([firstWash.id]);
+      setInitialServiceSelected(true);
     }
-  }, [services, servicesQuery.isLoading, selectedServiceIds.length]);
+  }, [activeServices, servicesQuery.isLoading, initialServiceSelected]);
   const selectedServices = selectedServiceIds
-    .map(id => services.find(service => service.id === id))
+    .map(id => activeServices.find(service => service.id === id))
     .filter((service): service is Service => Boolean(service));
-  const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
+  const subtotal = selectedServices.reduce((sum, service) => sum + servicePrice(service, vehicleSize), 0);
   const total = form.priceOverride ? Number(form.priceOverride) : subtotal;
   const toggleService = (id: number) => {
     setSelectedServiceIds(current => current.includes(id) ? current.filter(serviceId => serviceId !== id) : [...current, id]);
@@ -296,6 +304,7 @@ function NewOrderPage() {
         customer: form.customer,
         phone: form.phone,
         serviceIds: selectedServices.map(service => service.id),
+        vehicleSize,
         priceOverride: form.priceOverride ? Number(form.priceOverride) : null,
       },
     }, {
@@ -325,22 +334,39 @@ function NewOrderPage() {
       <Card className="h-fit border-[#dfe2d8] bg-[#faf8f0]">
         <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Servicios</CardTitle><p className="text-xs text-[#789087]">Selecciona uno o más servicios; sus precios se suman automáticamente.</p></CardHeader>
         <CardContent className="space-y-4">
+          <fieldset>
+            <legend className="mb-2 text-xs font-bold text-[#355d50]">Tamaño del vehículo</legend>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: VehicleSize.PEQUENO, label: 'Pequeño' },
+                { value: VehicleSize.MEDIANO, label: 'Mediano' },
+                { value: VehicleSize.GRANDE, label: 'Grande' },
+              ].map(size => <label key={size.value} className={`flex cursor-pointer items-center justify-center gap-2 rounded-lg border px-2 py-2.5 text-xs font-semibold ${vehicleSize === size.value ? 'border-[#5a9a78] bg-[#eaf3ec] text-[#285c4d]' : 'border-[#e1e5dc] text-[#789087]'}`}><input type="radio" name="vehicle-size" data-testid={`radio-vehicle-size-${size.value.toLowerCase()}`} value={size.value} checked={vehicleSize === size.value} onChange={() => setVehicleSize(size.value)} className="accent-[#1e6b58]" />{size.label}</label>)}
+            </div>
+          </fieldset>
           <fieldset className="space-y-2">
             <legend className="mb-2 text-xs font-bold text-[#355d50]">Servicios disponibles</legend>
-            {services.map(service => {
-              const checked = selectedServiceIds.includes(service.id);
-              return <label key={service.id} htmlFor={`order-service-${service.id}`} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${checked ? 'border-[#7fb39a] bg-[#eaf3ec]' : 'border-[#e1e5dc] bg-[#fbf8ef] hover:border-[#b9cdc0]'}`}>
-                <input id={`order-service-${service.id}`} data-testid={`checkbox-order-service-${service.id}`} type="checkbox" checked={checked} onChange={() => toggleService(service.id)} className="mt-1 h-4 w-4 accent-[#1e6b58]" />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-[#355d50]">{service.name}</span><span className="shrink-0 text-xs font-bold text-[#285c4d]">{money(service.price)}</span></span>
-                  {service.description && <span className="mt-1 block text-[10px] leading-4 text-[#789087]">{service.description}</span>}
-                </span>
-              </label>;
+            {[ServiceCategory.LAVADO, ServiceCategory.ADICIONAL, ServiceCategory.ESPECIALIZADO, ServiceCategory.GENERAL].map(category => {
+              const group = activeServices.filter(service => service.category === category);
+              if (!group.length) return null;
+              return <div key={category} className="space-y-2">
+                <h3 className="pt-2 text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">{serviceCategoryLabel(category)}</h3>
+                {group.map(service => {
+                  const checked = selectedServiceIds.includes(service.id);
+                  return <label key={service.id} htmlFor={`order-service-${service.id}`} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${checked ? 'border-[#7fb39a] bg-[#eaf3ec]' : 'border-[#e1e5dc] bg-[#fbf8ef] hover:border-[#b9cdc0]'}`}>
+                    <input id={`order-service-${service.id}`} data-testid={`checkbox-order-service-${service.id}`} type="checkbox" checked={checked} onChange={() => toggleService(service.id)} className="mt-1 h-4 w-4 accent-[#1e6b58]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-[#355d50]">{service.name}</span><span className="shrink-0 text-xs font-bold text-[#285c4d]">{money(servicePrice(service, vehicleSize))}</span></span>
+                      {service.description && <span className="mt-1 block text-[10px] leading-4 text-[#789087]">{service.description}</span>}
+                    </span>
+                  </label>;
+                })}
+              </div>;
             })}
           </fieldset>
           <div className="rounded-xl border border-[#d8e5db] bg-[#eaf3ec] p-4">
             <div className="mb-3 flex items-center justify-between"><p className="text-xs font-bold text-[#355d50]">Resumen</p><span className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-semibold text-[#668279]">{selectedServices.length} {selectedServices.length === 1 ? 'servicio' : 'servicios'}</span></div>
-            {selectedServices.length ? <div className="space-y-2">{selectedServices.map(service => <div key={service.id} className="flex justify-between gap-3 text-xs"><span className="text-[#668279]">{service.name}</span><span className="font-semibold text-[#355d50]">{money(service.price)}</span></div>)}</div> : <p className="text-xs text-[#789087]">Selecciona al menos un servicio.</p>}
+            {selectedServices.length ? <div className="space-y-2">{selectedServices.map(service => <div key={service.id} className="flex justify-between gap-3 text-xs"><span className="text-[#668279]">{service.name}</span><span className="font-semibold text-[#355d50]">{money(servicePrice(service, vehicleSize))}</span></div>)}</div> : <p className="text-xs text-[#789087]">Selecciona al menos un servicio.</p>}
             <div className="mt-3 flex items-center justify-between border-t border-[#c9ddd0] pt-3"><span className="text-xs font-bold text-[#355d50]">Subtotal</span><strong data-testid="text-order-service-subtotal" className="text-sm font-bold text-[#285c4d]">{money(subtotal)}</strong></div>
           </div>
           <div><Label htmlFor="priceOverride">Total acordado <span className="font-normal text-[#8aa097]">(opcional)</span></Label><Input id="priceOverride" data-testid="input-order-price" type="number" min="0" value={form.priceOverride} onChange={e => update('priceOverride', e.target.value)} placeholder={String(subtotal)} className="mt-2 h-11 bg-[#fbf8ef]" /></div>
@@ -382,12 +408,137 @@ function TimelineItem({ title, detail, time, current = false }: { title: string;
 function ServicesPage() {
   const query = useGetServices({ query: { queryKey: getGetServicesQueryKey(), retry: false } });
   const create = useCreateService();
+  const updateService = useUpdateService();
+  const removeService = useDeleteService();
   const services = query.data ?? (query.isError ? demoServices : []);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', price: '' });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const emptyForm = () => ({
+    name: '',
+    description: '',
+    category: ServiceCategory.LAVADO as typeof ServiceCategory[keyof typeof ServiceCategory],
+    priceSmall: '',
+    priceMedium: '',
+    priceLarge: '',
+  });
+  const [form, setForm] = useState(emptyForm);
   const [notice, setNotice] = useState('');
-  const submit = (event: FormEvent) => { event.preventDefault(); create.mutate({ data: { name: form.name, description: form.description, price: Number(form.price) } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetServicesQueryKey() }); setForm({ name: '', description: '', price: '' }); setOpen(false); setNotice('Servicio agregado al catálogo.'); }, onError: () => setNotice('No pudimos guardar el servicio.') }); };
-  return <div className="page-in"><PageTitle eyebrow="Catálogo de atención" title="Servicios" description="Define la oferta que el equipo puede vender y ejecutar." action={<Button type="button" data-testid="button-open-service-form" onClick={() => setOpen(true)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><Plus size={17} /> Nuevo servicio</Button>} />{query.isError && <PreviewNotice />}{notice && <div data-testid="status-service-notice" className="mb-5 rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]">{notice}</div>}{open && <Card className="mb-5 border-[#bdd7c6] bg-[#eef6ef]"><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="display-font text-lg text-[#173a32]">Nuevo servicio</CardTitle><p className="text-xs text-[#668279]">Aparecerá en el formulario de ingreso.</p></div><button type="button" data-testid="button-close-service-form" onClick={() => setOpen(false)}><X size={18} className="text-[#668279]" /></button></CardHeader><CardContent><form onSubmit={submit} className="grid gap-4 md:grid-cols-[1fr_1.4fr_.6fr_auto] md:items-end"><div><Label htmlFor="service-name">Nombre</Label><Input id="service-name" data-testid="input-service-name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Lavado de motor" /></div><div><Label htmlFor="service-description">Descripción</Label><Input id="service-description" data-testid="input-service-description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="mt-2 bg-[#fbf8ef]" placeholder="Qué incluye…" /></div><div><Label htmlFor="service-price">Precio</Label><Input id="service-price" data-testid="input-service-price" type="number" min="0" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="0" /></div><Button type="submit" data-testid="button-create-service" disabled={create.isPending} className="h-10 rounded-xl bg-[#1e6b58] font-bold text-white">Guardar</Button></form></CardContent></Card>}<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{services.map(service => <Card key={service.id} data-testid={`card-service-${service.id}`} className="border-[#dfe2d8] bg-[#faf8f0] transition-transform hover:-translate-y-0.5"><CardContent className="p-5"><div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e4efe9] text-[#2f9274]"><Droplets size={18} /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${service.active ? 'bg-[#e4efe9] text-[#2d765e]' : 'bg-[#eee9de] text-[#897e70]'}`}>{service.active ? 'Activo' : 'Pausado'}</span></div><h2 data-testid={`text-service-name-${service.id}`} className="display-font mt-5 text-xl font-bold text-[#173a32]">{service.name}</h2><p className="mt-2 min-h-10 text-sm leading-5 text-[#789087]">{service.description}</p><div className="mt-5 flex items-end justify-between border-t border-[#e7e8df] pt-4"><span className="text-xs text-[#8aa097]">Precio base</span><strong data-testid={`text-service-price-${service.id}`} className="display-font text-2xl text-[#285c4d]">{money(service.price)}</strong></div></CardContent></Card>)}</div></div>;
+  const closeForm = () => {
+    setOpen(false);
+    setEditingId(null);
+    setForm(emptyForm());
+  };
+  const beginEdit = (service: Service) => {
+    setEditingId(service.id);
+    setForm({
+      name: service.name,
+      description: service.description,
+      category: service.category,
+      priceSmall: String(service.priceSmall),
+      priceMedium: String(service.priceMedium),
+      priceLarge: String(service.priceLarge),
+    });
+    setOpen(true);
+  };
+  const saveSuccess = (message: string) => {
+    queryClient.invalidateQueries({ queryKey: getGetServicesQueryKey() });
+    closeForm();
+    setNotice(message);
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    setNotice('');
+    const data = {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      category: form.category,
+      priceSmall: Number(form.priceSmall),
+      priceMedium: Number(form.priceMedium),
+      priceLarge: Number(form.priceLarge),
+    };
+    if (editingId !== null) {
+      updateService.mutate({ id: editingId, data }, {
+        onSuccess: () => saveSuccess('Servicio y precios actualizados. Las órdenes anteriores mantienen sus valores.'),
+        onError: () => setNotice('No pudimos actualizar el servicio.'),
+      });
+      return;
+    }
+    create.mutate({ data }, {
+      onSuccess: () => saveSuccess('Servicio agregado al catálogo.'),
+      onError: () => setNotice('No pudimos guardar el servicio.'),
+    });
+  };
+  const remove = (service: Service) => {
+    if (!window.confirm(`¿Quitar “${service.name}” del catálogo activo? No aparecerá en nuevas órdenes; las órdenes anteriores se conservan.`)) return;
+    removeService.mutate({ id: service.id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetServicesQueryKey() });
+        setNotice('Servicio quitado del catálogo activo. El historial de órdenes se conservó.');
+      },
+      onError: () => setNotice('No se pudo quitar el servicio del catálogo.'),
+    });
+  };
+  const restore = (service: Service) => {
+    updateService.mutate({ id: service.id, data: { active: true } }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetServicesQueryKey() });
+        setNotice('Servicio reactivado en el catálogo. Revisa sus precios antes de usarlo.');
+      },
+      onError: () => setNotice('No se pudo reactivar el servicio.'),
+    });
+  };
+  const saving = create.isPending || updateService.isPending;
+  const categories = [ServiceCategory.LAVADO, ServiceCategory.ADICIONAL, ServiceCategory.ESPECIALIZADO, ServiceCategory.GENERAL];
+  return <div className="page-in">
+    <PageTitle eyebrow="Catálogo de atención" title="Servicios" description="Edita nombres y precios por tamaño, o quita servicios del menú de nuevas órdenes." action={<Button type="button" data-testid="button-open-service-form" onClick={() => { setEditingId(null); setForm(emptyForm()); setOpen(true); }} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><Plus size={17} /> Nuevo servicio</Button>} />
+    {query.isError && <PreviewNotice />}
+    {notice && <div data-testid="status-service-notice" className="mb-5 rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]">{notice}</div>}
+    {open && <Card className="mb-5 border-[#bdd7c6] bg-[#eef6ef]">
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div><CardTitle className="display-font text-lg text-[#173a32]">{editingId !== null ? 'Editar servicio' : 'Nuevo servicio'}</CardTitle><p className="text-xs text-[#668279]">Los cambios de catálogo no modifican órdenes ya registradas.</p></div>
+        <button type="button" data-testid="button-close-service-form" onClick={closeForm} aria-label="Cerrar formulario"><X size={18} className="text-[#668279]" /></button>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
+          <div><Label htmlFor="service-name">Nombre</Label><Input id="service-name" data-testid="input-service-name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Lavado de motor" /></div>
+          <div><Label htmlFor="service-category">Categoría</Label><select id="service-category" data-testid="select-service-category" value={form.category} onChange={e => setForm({ ...form, category: e.target.value as typeof form.category })} className="mt-2 h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]">{categories.map(category => <option key={category} value={category}>{serviceCategoryLabel(category)}</option>)}</select></div>
+          <div className="md:col-span-2"><Label htmlFor="service-description">Descripción</Label><Input id="service-description" data-testid="input-service-description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="mt-2 bg-[#fbf8ef]" placeholder="Qué incluye…" /></div>
+          <fieldset className="grid gap-3 sm:grid-cols-3 md:col-span-2">
+            <legend className="mb-2 text-xs font-bold text-[#355d50]">Precios por tamaño de vehículo</legend>
+            {[
+              { key: 'priceSmall' as const, label: 'Pequeño' },
+              { key: 'priceMedium' as const, label: 'Mediano' },
+              { key: 'priceLarge' as const, label: 'Grande' },
+            ].map(size => <div key={size.key}><Label htmlFor={`service-${size.key}`}>{size.label}</Label><Input id={`service-${size.key}`} data-testid={`input-service-${size.key}`} type="number" min="0" step="1" value={form[size.key]} onChange={e => setForm({ ...form, [size.key]: e.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="0" /></div>)}
+          </fieldset>
+          <div className="flex gap-3 md:col-span-2"><Button type="submit" data-testid="button-save-service" disabled={saving} className="h-10 rounded-xl bg-[#1e6b58] font-bold text-white">{saving ? 'Guardando…' : editingId !== null ? 'Guardar cambios' : 'Agregar servicio'}</Button><Button type="button" variant="outline" onClick={closeForm} className="h-10 rounded-xl border-[#ccd9d1] font-bold text-[#285c4d]">Cancelar</Button></div>
+        </form>
+      </CardContent>
+    </Card>}
+    {categories.map(category => {
+      const group = services.filter(service => service.category === category);
+      if (!group.length) return null;
+      return <section key={category} className="mb-8">
+        <div className="mb-3 flex items-center justify-between"><div><h2 className="display-font text-xl font-bold text-[#173a32]">{serviceCategoryLabel(category)}</h2><p className="text-xs text-[#789087]">{group.filter(service => service.active).length} activos · precios en CLP</p></div></div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {group.map(service => <Card key={service.id} data-testid={`card-service-${service.id}`} className={`border-[#dfe2d8] bg-[#faf8f0] ${!service.active ? 'opacity-75' : ''}`}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#e4efe9] text-[#2f9274]"><Droplets size={18} /></span><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${service.active ? 'bg-[#e4efe9] text-[#2d765e]' : 'bg-[#eee9de] text-[#897e70]'}`}>{service.active ? 'Activo' : 'Pausado'}</span></div>
+              <h3 data-testid={`text-service-name-${service.id}`} className="display-font mt-5 text-lg font-bold text-[#173a32]">{service.name}</h3>
+              <p className="mt-2 min-h-10 text-xs leading-5 text-[#789087]">{service.description || 'Sin descripción.'}</p>
+              <div className="mt-4 grid grid-cols-3 gap-2 border-t border-[#e7e8df] pt-4">
+                {[['Pequeño', service.priceSmall], ['Mediano', service.priceMedium], ['Grande', service.priceLarge]].map(([label, price]) => <div key={label} className="rounded-lg bg-[#f1f2eb] p-2"><p className="text-[9px] uppercase tracking-wide text-[#8aa097]">{label}</p><strong className="mt-1 block text-xs text-[#285c4d]">{money(Number(price))}</strong></div>)}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" data-testid={`button-edit-service-${service.id}`} onClick={() => beginEdit(service)} variant="outline" className="h-9 rounded-lg border-[#ccd9d1] px-3 text-xs font-bold text-[#285c4d]"><Pencil size={13} /> Editar</Button>
+                {service.active ? <Button type="button" data-testid={`button-remove-service-${service.id}`} disabled={removeService.isPending} onClick={() => remove(service)} variant="outline" className="h-9 rounded-lg border-[#e6c9be] px-3 text-xs font-bold text-[#a64a30]"><Trash2 size={13} /> Quitar</Button> : <Button type="button" data-testid={`button-restore-service-${service.id}`} disabled={updateService.isPending} onClick={() => restore(service)} variant="outline" className="h-9 rounded-lg border-[#bcd9c8] px-3 text-xs font-bold text-[#2d765e]"><RefreshCw size={13} /> Reactivar</Button>}
+              </div>
+            </CardContent>
+          </Card>)}
+        </div>
+      </section>;
+    })}
+  </div>;
 }
 
 function AuditPage() {

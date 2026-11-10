@@ -7,6 +7,7 @@
  */
 import type { OrderPaymentMethod } from './orderPaymentMethod';
 import type { OrderStatus } from './orderStatus';
+import type { VehicleSize } from './vehicleSize';
 
 export interface Order {
   id: number;
@@ -16,6 +17,7 @@ export interface Order {
   phone: string;
   serviceId: number;
   serviceName: string;
+  vehicleSize: VehicleSize;
   /** @minimum 0 */
   price: number;
   status: OrderStatus;

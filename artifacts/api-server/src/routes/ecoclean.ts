@@ -7,6 +7,7 @@ import {
   GetOrdersQueryParams,
   InviteUserBody,
   RecordPaymentBody,
+  UpdateServiceBody,
   UpdateOrderBody,
   UpdateOrderStatusBody,
 } from "@workspace/api-zod";
@@ -36,6 +37,30 @@ type PaymentMethod = (typeof paymentMethods)[number];
 type OrderStatus = (typeof statuses)[number];
 const userRoles = ["ADMIN", "SUPERVISOR", "CAJERO", "OPERADOR"] as const;
 type UserRole = (typeof userRoles)[number];
+const serviceCategories = ["LAVADO", "ADICIONAL", "ESPECIALIZADO", "GENERAL"] as const;
+const vehicleSizes = ["PEQUENO", "MEDIANO", "GRANDE"] as const;
+type ServiceCategory = (typeof serviceCategories)[number];
+type VehicleSize = (typeof vehicleSizes)[number];
+
+const catalogSeed: Array<typeof services.$inferInsert> = [
+  { name: "Lavado Exterior", description: "Lavado exterior del vehículo.", category: "LAVADO", price: 17990, priceSmall: 15990, priceMedium: 17990, priceLarge: 18990 },
+  { name: "Limpieza Interior", description: "Limpieza de interior del vehículo.", category: "LAVADO", price: 15990, priceSmall: 13990, priceMedium: 15990, priceLarge: 16990 },
+  { name: "Lavado Full Diamante (Interior + Exterior)", description: "Lavado completo interior y exterior.", category: "LAVADO", price: 29990, priceSmall: 27990, priceMedium: 29990, priceLarge: 31990 },
+  { name: "Restauración de Color", description: "Tratamiento de restauración de color de carrocería.", category: "ADICIONAL", price: 9490, priceSmall: 7490, priceMedium: 9490, priceLarge: 11490 },
+  { name: "Encerado Express", description: "Aplicación de cera sintética.", category: "ADICIONAL", price: 8490, priceSmall: 6490, priceMedium: 8490, priceLarge: 10490 },
+  { name: "Aspirado Pet Lover", description: "Aspirado para mascotas; adicional a la limpieza interior.", category: "ADICIONAL", price: 6490, priceSmall: 5490, priceMedium: 6490, priceLarge: 7490 },
+  { name: "Extra Sucio", description: "Adicional para suciedad intensa sobre el lavado exterior.", category: "ADICIONAL", price: 7490, priceSmall: 6490, priceMedium: 7490, priceLarge: 8490 },
+  { name: "Limpieza de Tapiz (2 Asientos)", description: "Limpieza de tapiz para dos asientos.", category: "ESPECIALIZADO", price: 27990, priceSmall: 24990, priceMedium: 27990, priceLarge: 29990 },
+  { name: "Limpieza de Tapiz (5 Asientos)", description: "Limpieza de tapiz para cinco asientos.", category: "ESPECIALIZADO", price: 44990, priceSmall: 39990, priceMedium: 44990, priceLarge: 49990 },
+  { name: "Limpieza de Alfombra de Techo", description: "Limpieza de alfombra interior del techo.", category: "ESPECIALIZADO", price: 29990, priceSmall: 24990, priceMedium: 29990, priceLarge: 34990 },
+  { name: "Limpieza de Alfombras de Piso", description: "Limpieza de alfombras interiores del piso.", category: "ESPECIALIZADO", price: 34990, priceSmall: 29990, priceMedium: 34990, priceLarge: 39990 },
+  { name: "Pulido de Carrocería por Pieza", description: "Pulido de una pieza de carrocería.", category: "ESPECIALIZADO", price: 19990, priceSmall: 14990, priceMedium: 19990, priceLarge: 24990 },
+  { name: "Pulido de Carrocería + Cera Sintética", description: "Pulido de carrocería con aplicación de cera sintética.", category: "ESPECIALIZADO", price: 119990, priceSmall: 99990, priceMedium: 119990, priceLarge: 149990 },
+  { name: "Pulido de Carrocería + Servicio de Cerámica", description: "Pulido de carrocería con servicio de cerámica.", category: "ESPECIALIZADO", price: 199990, priceSmall: 169990, priceMedium: 199990, priceLarge: 219990 },
+  { name: "Pulido de Faros", description: "Pulido y restauración de faros.", category: "ESPECIALIZADO", price: 26990, priceSmall: 24990, priceMedium: 26990, priceLarge: 29990 },
+  { name: "Lavado de Motor", description: "Limpieza de motor.", category: "ESPECIALIZADO", price: 24990, priceSmall: 19990, priceMedium: 24990, priceLarge: 29990 },
+  { name: "Grabado de Patente por Vidrio", description: "Grabado de patente en cada vidrio.", category: "ESPECIALIZADO", price: 7990, priceSmall: 7990, priceMedium: 7990, priceLarge: 7990 },
+];
 
 function actorFor(req: Request) {
   const userId = getAuth(req).userId;
@@ -136,6 +161,9 @@ function serializeOrder(order: Order) {
     phone: order.phone,
     serviceId: order.serviceId,
     serviceName: order.serviceName,
+    vehicleSize: (vehicleSizes.includes(order.vehicleSize as VehicleSize)
+      ? order.vehicleSize
+      : "MEDIANO") as VehicleSize,
     price: order.price,
     status: order.status as OrderStatus,
     createdAt: order.createdAt.toISOString(),
@@ -144,6 +172,23 @@ function serializeOrder(order: Order) {
     lastActionBy: order.lastActionBy,
     paymentMethod: order.paymentMethod as PaymentMethod | null,
     barcode: orderNumber(order.id),
+  };
+}
+
+function serializeService(service: typeof services.$inferSelect) {
+  const priceMedium = service.priceMedium ?? service.price;
+  return {
+    id: service.id,
+    name: service.name,
+    description: service.description,
+    category: (serviceCategories.includes(service.category as ServiceCategory)
+      ? service.category
+      : "GENERAL") as ServiceCategory,
+    price: priceMedium,
+    priceSmall: service.priceSmall ?? service.price,
+    priceMedium,
+    priceLarge: service.priceLarge ?? service.price,
+    active: service.active,
   };
 }
 
@@ -178,25 +223,15 @@ let seedPromise: Promise<void> | null = null;
 async function ensureSeeded() {
   if (seedPromise) return seedPromise;
   seedPromise = (async () => {
-    const existingServices = await db.select({ id: services.id }).from(services).limit(1);
-    if (existingServices.length === 0) {
-      await db.insert(services).values([
-        {
-          name: "Lavado Premium",
-          description: "Lavado exterior, interior y protección ecológica",
-          price: 18000,
-        },
-        {
-          name: "Lavado Express",
-          description: "Lavado exterior eficiente con productos biodegradables",
-          price: 12000,
-        },
-        {
-          name: "Interior Profundo",
-          description: "Limpieza detallada de tapiz, tablero y piso",
-          price: 25000,
-        },
-      ]);
+    const existingNames = new Set(
+      (await db.select({ name: services.name }).from(services))
+        .map(({ name }) => name.trim().toLocaleLowerCase("es-CL")),
+    );
+    const missingCatalogServices = catalogSeed.filter(
+      ({ name }) => !existingNames.has(name.trim().toLocaleLowerCase("es-CL")),
+    );
+    if (missingCatalogServices.length > 0) {
+      await db.insert(services).values(missingCatalogServices);
     }
 
     const existingOrders = await db.select({ id: orders.id }).from(orders).limit(1);
@@ -276,21 +311,98 @@ router.get("/dashboard", async (req, res) => {
 
 router.get("/services", async (req, res) => {
   if (!requireActor(req, res)) return;
-  const rows = await db.select().from(services).where(eq(services.active, true)).orderBy(asc(services.id));
-  res.json(rows);
+  const rows = await db.select().from(services).orderBy(asc(services.id));
+  res.json(rows.map(serializeService));
 });
 
 router.post("/services", async (req, res) => {
   const actor = requireActor(req, res);
   if (!actor) return;
   const input = CreateServiceBody.parse(req.body);
-  const [created] = await db.insert(services).values(input).returning();
+  const [created] = await db.insert(services).values({
+    name: input.name.trim(),
+    description: input.description.trim(),
+    category: input.category,
+    price: input.priceMedium,
+    priceSmall: input.priceSmall,
+    priceMedium: input.priceMedium,
+    priceLarge: input.priceLarge,
+    active: true,
+  }).returning();
   if (!created) {
     res.status(500).json({ error: "No se pudo crear el servicio" });
     return;
   }
   await addAudit(actor, "SERVICIO_CREADO", `Servicio ${created.name} agregado al catálogo`);
-  res.status(201).json(created);
+  res.status(201).json(serializeService(created));
+});
+
+router.patch("/services/:id", async (req, res) => {
+  const actor = requireActor(req, res);
+  if (!actor) return;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Identificador de servicio inválido" });
+    return;
+  }
+  const input = UpdateServiceBody.parse(req.body);
+  if (Object.keys(input).length === 0) {
+    res.status(400).json({ error: "Incluye al menos un cambio para el servicio" });
+    return;
+  }
+  const [existing] = await db.select().from(services).where(eq(services.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Servicio no encontrado" });
+    return;
+  }
+  const [updated] = await db.update(services).set({
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.description !== undefined ? { description: input.description.trim() } : {}),
+    ...(input.category !== undefined ? { category: input.category } : {}),
+    ...(input.priceSmall !== undefined ? { priceSmall: input.priceSmall } : {}),
+    ...(input.priceMedium !== undefined ? { priceMedium: input.priceMedium, price: input.priceMedium } : {}),
+    ...(input.priceLarge !== undefined ? { priceLarge: input.priceLarge } : {}),
+    ...(input.active !== undefined ? { active: input.active } : {}),
+  }).where(eq(services.id, id)).returning();
+  if (!updated) {
+    res.status(404).json({ error: "Servicio no encontrado" });
+    return;
+  }
+  const changed = [
+    input.name !== undefined ? "nombre" : null,
+    input.description !== undefined ? "descripción" : null,
+    input.category !== undefined ? "categoría" : null,
+    input.priceSmall !== undefined || input.priceMedium !== undefined || input.priceLarge !== undefined ? "precios" : null,
+    input.active !== undefined ? "disponibilidad" : null,
+  ].filter(Boolean).join(", ");
+  await addAudit(actor, "SERVICIO_ACTUALIZADO", `Servicio ${updated.name} actualizado (${changed})`);
+  res.json(serializeService(updated));
+});
+
+router.delete("/services/:id", async (req, res) => {
+  const actor = requireActor(req, res);
+  if (!actor) return;
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id <= 0) {
+    res.status(400).json({ error: "Identificador de servicio inválido" });
+    return;
+  }
+  const [existing] = await db.select().from(services).where(eq(services.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Servicio no encontrado" });
+    return;
+  }
+  if (!existing.active) {
+    res.json(serializeService(existing));
+    return;
+  }
+  const [updated] = await db.update(services).set({ active: false }).where(eq(services.id, id)).returning();
+  if (!updated) {
+    res.status(404).json({ error: "Servicio no encontrado" });
+    return;
+  }
+  await addAudit(actor, "SERVICIO_QUITADO", `Servicio ${updated.name} quitado del catálogo activo`);
+  res.json(serializeService(updated));
 });
 
 router.get("/orders", async (req, res) => {
@@ -336,7 +448,14 @@ router.post("/orders", async (req, res) => {
     return;
   }
   const serviceName = selectedServices.map((service) => service.name).join(" + ");
-  const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
+  const subtotal = selectedServices.reduce((sum, service) => {
+    const servicePrice = input.vehicleSize === "PEQUENO"
+      ? service.priceSmall ?? service.price
+      : input.vehicleSize === "GRANDE"
+        ? service.priceLarge ?? service.price
+        : service.priceMedium ?? service.price;
+    return sum + servicePrice;
+  }, 0);
   const price = input.priceOverride ?? subtotal;
   const [created] = await db
     .insert(orders)
@@ -346,6 +465,7 @@ router.post("/orders", async (req, res) => {
       phone: input.phone.trim(),
       serviceId: primaryService.id,
       serviceName,
+      vehicleSize: input.vehicleSize,
       price,
       enteredBy: actor,
       lastActionBy: actor,

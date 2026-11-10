@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { VehicleSize } from './vehicleSize';
 
 export interface OrderInput {
   /** @minLength 2 */
@@ -17,6 +18,7 @@ export interface OrderInput {
      * @items.minimum 1
      */
   serviceIds: number[];
+  vehicleSize: VehicleSize;
   /**
      * @minimum 0
      * @nullable

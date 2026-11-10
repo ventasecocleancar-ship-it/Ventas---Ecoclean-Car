@@ -9,12 +9,29 @@ export interface HealthStatus {
   status: string;
 }
 
+export type ServiceCategory = typeof ServiceCategory[keyof typeof ServiceCategory];
+
+
+export const ServiceCategory = {
+  LAVADO: 'LAVADO',
+  ADICIONAL: 'ADICIONAL',
+  ESPECIALIZADO: 'ESPECIALIZADO',
+  GENERAL: 'GENERAL',
+} as const;
+
 export interface Service {
   id: number;
   name: string;
   description: string;
+  category: ServiceCategory;
   /** @minimum 0 */
   price: number;
+  /** @minimum 0 */
+  priceSmall: number;
+  /** @minimum 0 */
+  priceMedium: number;
+  /** @minimum 0 */
+  priceLarge: number;
   active: boolean;
 }
 
@@ -22,9 +39,37 @@ export interface ServiceInput {
   /** @minLength 1 */
   name: string;
   description: string;
+  category: ServiceCategory;
   /** @minimum 0 */
-  price: number;
+  priceSmall: number;
+  /** @minimum 0 */
+  priceMedium: number;
+  /** @minimum 0 */
+  priceLarge: number;
 }
+
+export interface ServiceUpdate {
+  /** @minLength 1 */
+  name?: string;
+  description?: string;
+  category?: ServiceCategory;
+  /** @minimum 0 */
+  priceSmall?: number;
+  /** @minimum 0 */
+  priceMedium?: number;
+  /** @minimum 0 */
+  priceLarge?: number;
+  active?: boolean;
+}
+
+export type VehicleSize = typeof VehicleSize[keyof typeof VehicleSize];
+
+
+export const VehicleSize = {
+  PEQUENO: 'PEQUENO',
+  MEDIANO: 'MEDIANO',
+  GRANDE: 'GRANDE',
+} as const;
 
 export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
 
@@ -68,6 +113,7 @@ export interface Order {
   phone: string;
   serviceId: number;
   serviceName: string;
+  vehicleSize: VehicleSize;
   /** @minimum 0 */
   price: number;
   status: OrderStatus;
@@ -91,6 +137,7 @@ export interface OrderInput {
      * @items.minimum 1
      */
   serviceIds: number[];
+  vehicleSize: VehicleSize;
   /**
      * @minimum 0
      * @nullable
