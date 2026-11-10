@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { Router, type IRouter, type Request } from "express";
 import { clerkClient, getAuth } from "@clerk/express";
 import {
@@ -315,20 +315,37 @@ router.post("/orders", async (req, res) => {
   const actor = requireActor(req, res);
   if (!actor) return;
   const input = CreateOrderBody.parse(req.body);
-  const [service] = await db.select().from(services).where(eq(services.id, input.serviceId)).limit(1);
-  if (!service || !service.active) {
-    res.status(400).json({ error: "El servicio seleccionado no está disponible" });
+  const requestedIds = [...new Set(input.serviceIds)];
+  if (requestedIds.length !== input.serviceIds.length) {
+    res.status(400).json({ error: "No puedes agregar el mismo servicio más de una vez" });
     return;
   }
-  const price = input.priceOverride ?? service.price;
+  const availableServices = await db
+    .select()
+    .from(services)
+    .where(and(inArray(services.id, requestedIds), eq(services.active, true)));
+  const servicesById = new Map(availableServices.map((service) => [service.id, service]));
+  if (servicesById.size !== requestedIds.length) {
+    res.status(400).json({ error: "Uno o más servicios seleccionados no están disponibles" });
+    return;
+  }
+  const selectedServices = requestedIds.map((id) => servicesById.get(id)!);
+  const primaryService = selectedServices[0];
+  if (!primaryService) {
+    res.status(400).json({ error: "Selecciona al menos un servicio" });
+    return;
+  }
+  const serviceName = selectedServices.map((service) => service.name).join(" + ");
+  const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
+  const price = input.priceOverride ?? subtotal;
   const [created] = await db
     .insert(orders)
     .values({
       plate: input.plate.trim().toUpperCase(),
       customer: input.customer.trim(),
       phone: input.phone.trim(),
-      serviceId: service.id,
-      serviceName: service.name,
+      serviceId: primaryService.id,
+      serviceName,
       price,
       enteredBy: actor,
       lastActionBy: actor,
@@ -338,7 +355,12 @@ router.post("/orders", async (req, res) => {
     res.status(500).json({ error: "No se pudo crear la orden" });
     return;
   }
-  await addAudit(actor, "ORDEN_CREADA", `Orden ${orderNumber(created.id)} ingresada para ${created.plate}`, created.id);
+  await addAudit(
+    actor,
+    "ORDEN_CREADA",
+    `Orden ${orderNumber(created.id)} ingresada para ${created.plate} con ${serviceName}; total $${price.toLocaleString("es-CL")}`,
+    created.id,
+  );
   if (input.priceOverride !== null && input.priceOverride !== undefined) {
     await addAudit(
       actor,

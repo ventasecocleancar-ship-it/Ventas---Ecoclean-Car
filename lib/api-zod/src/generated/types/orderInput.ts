@@ -12,7 +12,11 @@ export interface OrderInput {
   /** @minLength 1 */
   customer: string;
   phone: string;
-  serviceId: number;
+  /**
+     * @minItems 1
+     * @items.minimum 1
+     */
+  serviceIds: number[];
   /**
      * @minimum 0
      * @nullable

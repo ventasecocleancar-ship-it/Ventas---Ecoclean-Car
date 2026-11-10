@@ -14,3 +14,9 @@ Access follows the same separation: the administrator owns user creation and rem
 **Why:** Staff turnover is expected, but the business still needs the complete history of orders and cash actions after a collaborator leaves.
 
 **How to apply:** Use administrator-controlled invitations and role metadata for staff access; keep passwords and authentication lifecycle in Clerk, not in the EcoClean database.
+
+Order creation supports selecting multiple catalog services while retaining the current single-order schema: store the selected service names together and save the server-calculated combined total. If future work needs item-level reporting, editing, or discounts, introduce explicit order-service rows rather than parsing the combined display name.
+
+**Why:** The requested workflow needs one order with a correct combined price, and adding a line-item table is unnecessary schema work until item-level operations are required.
+
+**How to apply:** Keep price calculation server-owned and preserve existing order history; expand to a normalized line-item model only when downstream features need per-service data.

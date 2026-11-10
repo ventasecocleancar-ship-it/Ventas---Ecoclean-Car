@@ -147,6 +147,8 @@ export const GetOrdersResponse = zod.array(GetOrdersResponseItem)
 export const createOrderBodyPlateMin = 2;
 
 
+
+
 export const createOrderBodyPriceOverrideMin = 0;
 
 
@@ -155,7 +157,7 @@ export const CreateOrderBody = zod.object({
   "plate": zod.string().min(createOrderBodyPlateMin),
   "customer": zod.string().min(1),
   "phone": zod.string(),
-  "serviceId": zod.number().int(),
+  "serviceIds": zod.array(zod.number().int().min(1)).min(1),
   "priceOverride": zod.number().int().min(createOrderBodyPriceOverrideMin).nullish()
 })
 

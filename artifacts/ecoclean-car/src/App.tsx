@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ClerkProvider, Show, SignIn, SignUp } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
@@ -265,12 +265,93 @@ function NewOrderPage() {
   const servicesQuery = useGetServices({ query: { queryKey: getGetServicesQueryKey(), retry: false } });
   const services = servicesQuery.data ?? demoServices;
   const create = useCreateOrder();
-  const [form, setForm] = useState({ plate: '', customer: '', phone: '', serviceId: String(services[0]?.id ?? ''), priceOverride: '' });
-  const selected = services.find(service => service.id === Number(form.serviceId));
+  const [form, setForm] = useState({ plate: '', customer: '', phone: '', priceOverride: '' });
+  const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [error, setError] = useState('');
   const update = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }));
-  const submit = (event: FormEvent) => { event.preventDefault(); if (!form.plate || !form.customer || !form.phone || !selected) { setError('Completa los datos de contacto, la patente y el servicio.'); return; } setError(''); create.mutate({ data: { plate: form.plate.toUpperCase(), customer: form.customer, phone: form.phone, serviceId: selected.id, priceOverride: form.priceOverride ? Number(form.priceOverride) : null } }, { onSuccess: (order) => { queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setLocation(`/orders/${order.id}`); }, onError: () => setError('No pudimos guardar la orden. Revisa tu conexión e inténtalo nuevamente.') }); };
-  return <div className="page-in max-w-4xl"><Link href="/orders" data-testid="link-back-orders" className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-[#668279] hover:text-[#1e6b58]"><ArrowLeft size={15} /> Volver a órdenes</Link><PageTitle eyebrow="Ingreso de vehículo" title="Nueva orden" description="Registra lo esencial. El equipo completa el resto en movimiento." /><form onSubmit={submit} className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Datos del cliente</CardTitle><p className="text-xs text-[#789087]">La patente será el identificador rápido de esta visita.</p></CardHeader><CardContent className="space-y-5"><div className="grid gap-5 sm:grid-cols-2"><div><Label htmlFor="plate">Patente</Label><Input id="plate" data-testid="input-order-plate" value={form.plate} onChange={e => update('plate', e.target.value)} placeholder="AB-CD-12" className="mt-2 h-11 bg-[#fbf8ef] uppercase" required /></div><div><Label htmlFor="customer">Nombre cliente</Label><Input id="customer" data-testid="input-order-customer" value={form.customer} onChange={e => update('customer', e.target.value)} placeholder="Nombre y apellido" className="mt-2 h-11 bg-[#fbf8ef]" required /></div></div><div><Label htmlFor="phone">Teléfono</Label><Input id="phone" data-testid="input-order-phone" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+56 9 0000 0000" className="mt-2 h-11 bg-[#fbf8ef]" required /></div><div><Label htmlFor="notes">Nota de ingreso <span className="font-normal text-[#8aa097]">(opcional, solo para el equipo)</span></Label><Textarea id="notes" data-testid="input-order-notes" placeholder="Ej. revisar rayón en puerta trasera…" className="mt-2 min-h-24 resize-none bg-[#fbf8ef]" /></div></CardContent></Card><Card className="h-fit border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Servicio</CardTitle><p className="text-xs text-[#789087]">El precio queda registrado desde este momento.</p></CardHeader><CardContent className="space-y-5"><div><Label htmlFor="service">Tipo de lavado</Label><select id="service" data-testid="select-order-service" value={form.serviceId} onChange={e => update('serviceId', e.target.value)} className="mt-2 h-11 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50] outline-none focus:ring-2 focus:ring-[#9bc9b2]">{services.map(service => <option key={service.id} value={service.id}>{service.name} · {money(service.price)}</option>)}</select></div>{selected && <div className="rounded-2xl bg-[#e6f0e9] p-4"><p className="text-xs font-bold text-[#285c4d]">{selected.name}</p><p className="mt-1 text-xs leading-5 text-[#668279]">{selected.description}</p><div className="mt-4 flex items-end justify-between border-t border-[#c9ddd0] pt-3"><span className="text-xs text-[#668279]">Precio sugerido</span><strong data-testid="text-selected-service-price" className="display-font text-2xl text-[#285c4d]">{money(selected.price)}</strong></div></div>}<div><Label htmlFor="priceOverride">Precio acordado <span className="font-normal text-[#8aa097]">(opcional)</span></Label><Input id="priceOverride" data-testid="input-order-price" type="number" min="0" value={form.priceOverride} onChange={e => update('priceOverride', e.target.value)} placeholder={String(selected?.price ?? '')} className="mt-2 h-11 bg-[#fbf8ef]" /></div>{error && <p data-testid="status-order-error" className="rounded-lg bg-[#f9e3d9] px-3 py-2 text-xs font-semibold text-[#a64a30]">{error}</p>}<Button type="submit" data-testid="button-create-order" disabled={create.isPending} className="h-11 w-full rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]">{create.isPending ? 'Guardando…' : 'Registrar ingreso'} <ArrowRight size={16} /></Button><p className="text-center text-[10px] leading-4 text-[#8aa097]">Al registrar, se crea el ticket y queda trazabilidad del ingreso.</p></CardContent></Card></form></div>;
+  useEffect(() => {
+    if (!servicesQuery.isLoading && selectedServiceIds.length === 0 && services.length > 0) {
+      setSelectedServiceIds([services[0].id]);
+    }
+  }, [services, servicesQuery.isLoading, selectedServiceIds.length]);
+  const selectedServices = selectedServiceIds
+    .map(id => services.find(service => service.id === id))
+    .filter((service): service is Service => Boolean(service));
+  const subtotal = selectedServices.reduce((sum, service) => sum + service.price, 0);
+  const total = form.priceOverride ? Number(form.priceOverride) : subtotal;
+  const toggleService = (id: number) => {
+    setSelectedServiceIds(current => current.includes(id) ? current.filter(serviceId => serviceId !== id) : [...current, id]);
+    setError('');
+  };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!form.plate || !form.customer || !form.phone || selectedServices.length === 0) {
+      setError('Completa los datos del cliente y selecciona al menos un servicio.');
+      return;
+    }
+    setError('');
+    create.mutate({
+      data: {
+        plate: form.plate.toUpperCase(),
+        customer: form.customer,
+        phone: form.phone,
+        serviceIds: selectedServices.map(service => service.id),
+        priceOverride: form.priceOverride ? Number(form.priceOverride) : null,
+      },
+    }, {
+      onSuccess: (order) => {
+        queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        setLocation(`/orders/${order.id}`);
+      },
+      onError: () => setError('No pudimos guardar la orden. Revisa tu conexión e inténtalo nuevamente.'),
+    });
+  };
+  return <div className="page-in max-w-4xl">
+    <Link href="/orders" data-testid="link-back-orders" className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-[#668279] hover:text-[#1e6b58]"><ArrowLeft size={15} /> Volver a órdenes</Link>
+    <PageTitle eyebrow="Ingreso de vehículo" title="Nueva orden" description="Registra lo esencial. El equipo completa el resto en movimiento." />
+    <form onSubmit={submit} className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
+      <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+        <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Datos del cliente</CardTitle><p className="text-xs text-[#789087]">La patente será el identificador rápido de esta visita.</p></CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div><Label htmlFor="plate">Patente</Label><Input id="plate" data-testid="input-order-plate" value={form.plate} onChange={e => update('plate', e.target.value)} placeholder="AB-CD-12" className="mt-2 h-11 bg-[#fbf8ef] uppercase" required /></div>
+            <div><Label htmlFor="customer">Nombre cliente</Label><Input id="customer" data-testid="input-order-customer" value={form.customer} onChange={e => update('customer', e.target.value)} placeholder="Nombre y apellido" className="mt-2 h-11 bg-[#fbf8ef]" required /></div>
+          </div>
+          <div><Label htmlFor="phone">Teléfono</Label><Input id="phone" data-testid="input-order-phone" value={form.phone} onChange={e => update('phone', e.target.value)} placeholder="+56 9 0000 0000" className="mt-2 h-11 bg-[#fbf8ef]" required /></div>
+          <div><Label htmlFor="notes">Nota de ingreso <span className="font-normal text-[#8aa097]">(opcional, solo para el equipo)</span></Label><Textarea id="notes" data-testid="input-order-notes" placeholder="Ej. revisar rayón en puerta trasera…" className="mt-2 min-h-24 resize-none bg-[#fbf8ef]" /></div>
+        </CardContent>
+      </Card>
+      <Card className="h-fit border-[#dfe2d8] bg-[#faf8f0]">
+        <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Servicios</CardTitle><p className="text-xs text-[#789087]">Selecciona uno o más servicios; sus precios se suman automáticamente.</p></CardHeader>
+        <CardContent className="space-y-4">
+          <fieldset className="space-y-2">
+            <legend className="mb-2 text-xs font-bold text-[#355d50]">Servicios disponibles</legend>
+            {services.map(service => {
+              const checked = selectedServiceIds.includes(service.id);
+              return <label key={service.id} htmlFor={`order-service-${service.id}`} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${checked ? 'border-[#7fb39a] bg-[#eaf3ec]' : 'border-[#e1e5dc] bg-[#fbf8ef] hover:border-[#b9cdc0]'}`}>
+                <input id={`order-service-${service.id}`} data-testid={`checkbox-order-service-${service.id}`} type="checkbox" checked={checked} onChange={() => toggleService(service.id)} className="mt-1 h-4 w-4 accent-[#1e6b58]" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-3"><span className="text-xs font-bold text-[#355d50]">{service.name}</span><span className="shrink-0 text-xs font-bold text-[#285c4d]">{money(service.price)}</span></span>
+                  {service.description && <span className="mt-1 block text-[10px] leading-4 text-[#789087]">{service.description}</span>}
+                </span>
+              </label>;
+            })}
+          </fieldset>
+          <div className="rounded-xl border border-[#d8e5db] bg-[#eaf3ec] p-4">
+            <div className="mb-3 flex items-center justify-between"><p className="text-xs font-bold text-[#355d50]">Resumen</p><span className="rounded-full bg-white/70 px-2 py-1 text-[10px] font-semibold text-[#668279]">{selectedServices.length} {selectedServices.length === 1 ? 'servicio' : 'servicios'}</span></div>
+            {selectedServices.length ? <div className="space-y-2">{selectedServices.map(service => <div key={service.id} className="flex justify-between gap-3 text-xs"><span className="text-[#668279]">{service.name}</span><span className="font-semibold text-[#355d50]">{money(service.price)}</span></div>)}</div> : <p className="text-xs text-[#789087]">Selecciona al menos un servicio.</p>}
+            <div className="mt-3 flex items-center justify-between border-t border-[#c9ddd0] pt-3"><span className="text-xs font-bold text-[#355d50]">Subtotal</span><strong data-testid="text-order-service-subtotal" className="text-sm font-bold text-[#285c4d]">{money(subtotal)}</strong></div>
+          </div>
+          <div><Label htmlFor="priceOverride">Total acordado <span className="font-normal text-[#8aa097]">(opcional)</span></Label><Input id="priceOverride" data-testid="input-order-price" type="number" min="0" value={form.priceOverride} onChange={e => update('priceOverride', e.target.value)} placeholder={String(subtotal)} className="mt-2 h-11 bg-[#fbf8ef]" /></div>
+          <div className="flex items-end justify-between rounded-xl bg-[#173a32] px-4 py-3 text-[#fbf5e8]"><span className="text-xs font-semibold text-[#d5e5dc]">{form.priceOverride ? 'Total acordado' : 'Total del servicio'}</span><strong data-testid="text-order-service-total" className="display-font text-2xl">{money(total)}</strong></div>
+          {error && <p data-testid="status-order-error" className="rounded-lg bg-[#f9e3d9] px-3 py-2 text-xs font-semibold text-[#a64a30]">{error}</p>}
+          <Button type="submit" data-testid="button-create-order" disabled={create.isPending || servicesQuery.isLoading} className="h-11 w-full rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]">{create.isPending ? 'Guardando…' : 'Registrar ingreso'} <ArrowRight size={16} /></Button>
+          <p className="text-center text-[10px] leading-4 text-[#8aa097]">Al registrar, se crea el ticket con los servicios seleccionados y el total calculado.</p>
+        </CardContent>
+      </Card>
+    </form>
+  </div>;
 }
 
 function OrderDetailPage() {
