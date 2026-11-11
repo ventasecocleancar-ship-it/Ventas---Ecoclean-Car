@@ -1,4 +1,4 @@
-import bwipjs from "bwip-js";
+import bwipjs from "bwip-js/node";
 import { ReplitConnectors } from "@replit/connectors-sdk";
 import type { Order } from "@workspace/db/schema";
 

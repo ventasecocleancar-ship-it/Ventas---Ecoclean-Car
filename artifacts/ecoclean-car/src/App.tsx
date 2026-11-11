@@ -464,20 +464,128 @@ function OrderDetailPage() {
   const order = query.data ?? (query.isError ? demoOrders.find(item => item.id === id) : undefined);
   const updateStatus = useUpdateOrderStatus();
   const recordPayment = useRecordPayment();
+  const sendReceipt = useSendOrderReceipt();
   const updateOrder = useUpdateOrder();
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'DEBITO' | 'CREDITO'>('EFECTIVO');
   const [editMode, setEditMode] = useState(false);
   const [customer, setCustomer] = useState('');
   const [phone, setPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [notice, setNotice] = useState('');
   if (query.isLoading) return <PageSkeleton />;
   if (!order) return <div className="rounded-2xl border border-[#e8c7bc] bg-[#fff1eb] p-8 text-center"><h2 className="font-bold text-[#9b4e37]">No encontramos esta orden</h2><Link href="/orders" data-testid="link-order-not-found" className="mt-3 inline-block text-sm font-bold text-[#2f9274]">Volver a órdenes</Link></div>;
-  const move = (nextStatus: typeof OrderStatus[keyof typeof OrderStatus]) => { updateStatus.mutate({ id: order.id, data: { status: nextStatus, reason: null } }, { onSuccess: (next) => { queryClient.setQueryData(getGetOrderQueryKey(order.id), next); queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setNotice(`Orden actualizada a ${statusMeta[next.status]?.label}.`); }, onError: () => setNotice('No pudimos actualizar el estado. La acción no se guardó.') }); };
-  const pay = () => { recordPayment.mutate({ id: order.id, data: { method: paymentMethod, amount: order.price } }, { onSuccess: (next) => { queryClient.setQueryData(getGetOrderQueryKey(order.id), next); queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() }); queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() }); setNotice('Pago registrado.'); }, onError: () => setNotice('El pago no se registró. Intenta nuevamente.') }); };
-  const saveEdit = () => { updateOrder.mutate({ id: order.id, data: { customer, phone, reason: 'Actualización de datos desde detalle' } }, { onSuccess: (next) => { queryClient.setQueryData(getGetOrderQueryKey(order.id), next); setEditMode(false); setNotice('Datos del cliente actualizados.'); }, onError: () => setNotice('No se pudo actualizar el cliente.') }); };
+  const move = (nextStatus: typeof OrderStatus[keyof typeof OrderStatus]) => {
+    updateStatus.mutate({ id: order.id, data: { status: nextStatus, reason: null } }, {
+      onSuccess: next => {
+        queryClient.setQueryData(getGetOrderQueryKey(order.id), next);
+        queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        setNotice(`Orden actualizada a ${statusMeta[next.status]?.label}.`);
+      },
+      onError: () => setNotice('No pudimos actualizar el estado. La acción no se guardó.'),
+    });
+  };
+  const pay = () => {
+    recordPayment.mutate({ id: order.id, data: { method: paymentMethod, amount: order.price } }, {
+      onSuccess: next => {
+        queryClient.setQueryData(getGetOrderQueryKey(order.id), next);
+        queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+        setNotice('Pago registrado.');
+      },
+      onError: () => setNotice('El pago no se registró. Intenta nuevamente.'),
+    });
+  };
+  const saveEdit = () => {
+    updateOrder.mutate({ id: order.id, data: { customer, phone, customerEmail: customerEmail.trim() || null, reason: 'Actualización de datos desde detalle' } }, {
+      onSuccess: next => {
+        queryClient.setQueryData(getGetOrderQueryKey(order.id), next);
+        setEditMode(false);
+        setNotice(next.receiptEmailStatus === 'ENVIADO' ? 'Datos guardados y comprobante enviado.' : 'Datos del cliente actualizados.');
+      },
+      onError: () => setNotice('No se pudo actualizar el cliente. Revisa el correo e inténtalo nuevamente.'),
+    });
+  };
+  const retryReceipt = () => {
+    sendReceipt.mutate({ id: order.id }, {
+      onSuccess: next => {
+        queryClient.setQueryData(getGetOrderQueryKey(order.id), next);
+        setNotice(next.receiptEmailStatus === 'ENVIADO' ? `Comprobante enviado a ${next.customerEmail}.` : 'No se pudo enviar el comprobante. Puedes volver a intentarlo.');
+      },
+      onError: () => setNotice('No se pudo enviar el comprobante. Revisa la conexión de Gmail e inténtalo otra vez.'),
+    });
+  };
   const currentIndex = order.status === OrderStatus.ANULADO ? -1 : statusOrder.indexOf(order.status as Exclude<typeof OrderStatus[keyof typeof OrderStatus], 'ANULADO'>);
   const next = currentIndex >= 0 ? statusOrder[currentIndex + 1] : undefined;
-  return <div className="page-in"><Link href="/orders" data-testid="link-detail-back" className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-[#668279] hover:text-[#1e6b58]"><ArrowLeft size={15} /> Volver a órdenes</Link><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><div className="flex items-center gap-3"><span className="mono text-sm font-bold text-[#2f9274]">{order.number}</span><StatusBadge status={order.status} /></div><h1 data-testid="text-order-detail-title" className="display-font mt-3 text-4xl font-bold tracking-[-.05em] text-[#173a32]">{order.plate}</h1><p className="mt-1 text-sm text-[#789087]">{order.serviceName} · ingresado {shortDate(order.createdAt)}</p></div><div className="flex gap-2"><Button type="button" data-testid="button-print-ticket" variant="outline" onClick={() => window.print()} className="rounded-xl border-[#ccd9d1] bg-[#faf8f0] text-[#285c4d]"><Printer size={16} /> Imprimir ticket</Button>{next && <Button type="button" data-testid="button-next-status" disabled={updateStatus.isPending} onClick={() => move(next)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]">Marcar {statusMeta[next].label.toLowerCase()} <ArrowRight size={16} /></Button>}</div></div>{notice && <div data-testid="status-order-notice" className="mt-5 flex items-center justify-between rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]"><span className="flex items-center gap-2"><Check size={15} /> {notice}</span><button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice('')}><X size={15} /></button></div>}<div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_.8fr]"><div className="space-y-5"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Progreso de servicio</CardTitle></CardHeader><CardContent><div className="relative flex justify-between before:absolute before:left-5 before:right-5 before:top-5 before:h-0.5 before:bg-[#d9e3da] sm:before:left-7 sm:before:right-7">{statusOrder.map((step, index) => { const done = index <= currentIndex; const active = step === order.status; return <div key={step} className="relative z-10 flex w-1/6 flex-col items-center gap-2 text-center"><span className={`grid h-10 w-10 place-items-center rounded-full border-4 border-[#faf8f0] text-xs font-bold ${done ? 'bg-[#2f9274] text-white' : 'bg-[#e1e8df] text-[#8aa097]'} ${active ? 'ring-4 ring-[#f4d777]/60' : ''}`}>{done ? <Check size={15} /> : index + 1}</span><span className={`text-[10px] font-bold leading-3 ${active ? 'text-[#285c4d]' : 'text-[#8aa097]'}`}>{statusMeta[step].label}</span></div>; })}</div></CardContent></Card><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="display-font text-lg text-[#173a32]">Cliente</CardTitle><p className="mt-1 text-xs text-[#789087]">Información asociada a la orden</p></div><button type="button" data-testid="button-edit-customer" onClick={() => { setEditMode(true); setCustomer(order.customer); setPhone(order.phone); }} className="text-xs font-bold text-[#2f9274]">{editMode ? 'Editando' : 'Editar'}</button></CardHeader><CardContent>{editMode ? <div className="grid gap-4 sm:grid-cols-2"><div><Label htmlFor="detail-customer">Nombre</Label><Input id="detail-customer" data-testid="input-detail-customer" value={customer} onChange={e => setCustomer(e.target.value)} className="mt-2 bg-[#fbf8ef]" /></div><div><Label htmlFor="detail-phone">Teléfono</Label><Input id="detail-phone" data-testid="input-detail-phone" value={phone} onChange={e => setPhone(e.target.value)} className="mt-2 bg-[#fbf8ef]" /></div><Button type="button" data-testid="button-save-customer" onClick={saveEdit} className="w-fit rounded-lg bg-[#1e6b58] text-xs font-bold text-white">Guardar cambios</Button></div> : <div className="grid gap-4 sm:grid-cols-3"><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Nombre</p><p data-testid="text-order-customer" className="mt-1 text-sm font-bold text-[#355d50]">{order.customer}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Teléfono</p><p data-testid="text-order-phone" className="mt-1 text-sm font-bold text-[#355d50]">{order.phone}</p></div><div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Ingresó</p><p className="mt-1 text-sm font-bold text-[#355d50]">{order.enteredBy}</p></div></div>}</CardContent></Card><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Trazabilidad</CardTitle></CardHeader><CardContent className="space-y-4"><TimelineItem title="Orden creada" detail={`Ingreso registrado por ${order.enteredBy}`} time={shortDate(order.createdAt)} /><TimelineItem title={statusMeta[order.status]?.label ?? order.status} detail={`Última acción por ${order.lastActionBy}`} time={shortDate(order.updatedAt)} current /></CardContent></Card></div><div className="space-y-5"><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Resumen de pago</CardTitle></CardHeader><CardContent><div className="flex items-end justify-between border-b border-[#e7e8df] pb-4"><span className="text-xs text-[#789087]">{order.serviceName}</span><strong data-testid="text-order-price" className="display-font text-2xl text-[#285c4d]">{money(order.price)}</strong></div>{order.paymentMethod ? <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#e4efe9] p-3 text-xs font-bold text-[#2d765e]"><Check size={15} /> Pagado con {methodLabel(order.paymentMethod)}</div> : <div className="mt-4 space-y-3"><Label htmlFor="payment-method">Registrar pago</Label><select id="payment-method" data-testid="select-payment-method" value={paymentMethod} onChange={e => setPaymentMethod(e.target.value as typeof paymentMethod)} className="h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]"><option value="EFECTIVO">Efectivo</option><option value="DEBITO">Débito</option><option value="CREDITO">Crédito</option></select><Button type="button" data-testid="button-record-payment" disabled={recordPayment.isPending} onClick={pay} className="h-10 w-full rounded-xl bg-[#f0bd3e] font-bold text-[#173a32] hover:bg-[#e4ad2d]">{recordPayment.isPending ? 'Registrando…' : 'Registrar pago'} <CircleDollarSign size={15} /></Button></div>}</CardContent></Card><Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Ticket digital</CardTitle></CardHeader><CardContent><div className="rounded-xl border border-dashed border-[#cbd9cf] bg-[#f4f5ec] p-4 text-center"><div className="mx-auto flex max-w-[190px] items-center justify-center gap-0.5 py-2">{Array.from({ length: 36 }).map((_, i) => <i key={i} className={`h-10 ${i % 5 === 0 || i % 7 === 0 ? 'w-1.5 bg-[#173a32]' : i % 3 === 0 ? 'w-0.5 bg-[#173a32]' : 'w-[3px] bg-[#55756b]'}`} />)}</div><p data-testid="text-order-barcode" className="mono text-xs tracking-[.2em] text-[#355d50]">{order.barcode}</p></div><Button type="button" data-testid="button-print-barcode" variant="outline" onClick={() => window.print()} className="mt-3 h-10 w-full rounded-xl border-[#ccd9d1] text-xs font-bold text-[#285c4d]"><Printer size={15} /> Imprimir ticket</Button></CardContent></Card></div></div></div>;
+  return <div className="page-in">
+    <Link href="/orders" data-testid="link-detail-back" className="mb-6 inline-flex items-center gap-2 text-xs font-bold text-[#668279] hover:text-[#1e6b58]"><ArrowLeft size={15} /> Volver a órdenes</Link>
+    <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div>
+        <div className="flex items-center gap-3"><span className="mono text-sm font-bold text-[#2f9274]">{order.number}</span><StatusBadge status={order.status} /></div>
+        <h1 data-testid="text-order-detail-title" className="display-font mt-3 text-4xl font-bold tracking-[-.05em] text-[#173a32]">{order.plate}</h1>
+        <p className="mt-1 text-sm text-[#789087]">{order.serviceName} · {vehicleSizeLabel(order.vehicleSize)} · ingresado {shortDate(order.createdAt)}</p>
+      </div>
+      <div className="flex gap-2">
+        <Button type="button" data-testid="button-print-ticket" variant="outline" onClick={() => window.print()} className="rounded-xl border-[#ccd9d1] bg-[#faf8f0] text-[#285c4d]"><Printer size={16} /> Imprimir ticket</Button>
+        {next && <Button type="button" data-testid="button-next-status" disabled={updateStatus.isPending} onClick={() => move(next)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]">Marcar {statusMeta[next].label.toLowerCase()} <ArrowRight size={16} /></Button>}
+      </div>
+    </div>
+    {notice && <div data-testid="status-order-notice" className="mt-5 flex items-center justify-between rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]"><span className="flex items-center gap-2"><Check size={15} /> {notice}</span><button type="button" data-testid="button-dismiss-notice" onClick={() => setNotice('')}><X size={15} /></button></div>}
+    <div className="mt-7 grid gap-5 xl:grid-cols-[1.4fr_.8fr]">
+      <div className="space-y-5">
+        <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Progreso del servicio</CardTitle><p className="text-xs text-[#789087]">Entrada → En puente → Servicio finalizado → Pago → Entrega</p></CardHeader>
+          <CardContent><div className="relative flex justify-between before:absolute before:left-5 before:right-5 before:top-5 before:h-0.5 before:bg-[#d9e3da] sm:before:left-7 sm:before:right-7">{statusOrder.map((step, index) => { const done = index <= currentIndex; const active = step === order.status; return <div key={step} className="relative z-10 flex w-1/6 flex-col items-center gap-2 text-center"><span className={`grid h-10 w-10 place-items-center rounded-full border-4 border-[#faf8f0] text-xs font-bold ${done ? 'bg-[#2f9274] text-white' : 'bg-[#e1e8df] text-[#8aa097]'} ${active ? 'ring-4 ring-[#f4d777]/60' : ''}`}>{done ? <Check size={15} /> : index + 1}</span><span className={`text-[10px] font-bold leading-3 ${active ? 'text-[#285c4d]' : 'text-[#8aa097]'}`}>{statusMeta[step].label}</span></div>; })}</div></CardContent>
+        </Card>
+        <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <div><CardTitle className="display-font text-lg text-[#173a32]">Cliente</CardTitle><p className="mt-1 text-xs text-[#789087]">Información asociada a la orden</p></div>
+            <button type="button" data-testid="button-edit-customer" onClick={() => { setEditMode(true); setCustomer(order.customer); setPhone(order.phone); setCustomerEmail(order.customerEmail ?? ''); }} className="text-xs font-bold text-[#2f9274]">{editMode ? 'Editando' : 'Editar'}</button>
+          </CardHeader>
+          <CardContent>
+            {editMode ? <div className="grid gap-4 sm:grid-cols-2">
+              <div><Label htmlFor="detail-customer">Nombre</Label><Input id="detail-customer" data-testid="input-detail-customer" value={customer} onChange={event => setCustomer(event.target.value)} className="mt-2 bg-[#fbf8ef]" /></div>
+              <div><Label htmlFor="detail-phone">Teléfono</Label><Input id="detail-phone" data-testid="input-detail-phone" value={phone} onChange={event => setPhone(event.target.value)} className="mt-2 bg-[#fbf8ef]" /></div>
+              <div><Label htmlFor="detail-email">Gmail o correo</Label><Input id="detail-email" data-testid="input-detail-email" type="email" value={customerEmail} onChange={event => setCustomerEmail(event.target.value)} placeholder="cliente@gmail.com" className="mt-2 bg-[#fbf8ef]" /></div>
+              <div className="flex items-end gap-2"><Button type="button" data-testid="button-save-customer" disabled={updateOrder.isPending} onClick={saveEdit} className="w-fit rounded-lg bg-[#1e6b58] text-xs font-bold text-white">{updateOrder.isPending ? 'Guardando…' : 'Guardar cambios'}</Button><Button type="button" variant="outline" onClick={() => setEditMode(false)} className="rounded-lg border-[#ccd9d1] text-xs">Cancelar</Button></div>
+            </div> : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Nombre</p><p data-testid="text-order-customer" className="mt-1 text-sm font-bold text-[#355d50]">{order.customer}</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Teléfono</p><p data-testid="text-order-phone" className="mt-1 text-sm font-bold text-[#355d50]">{order.phone}</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Correo</p><p data-testid="text-order-email" className="mt-1 break-all text-sm font-bold text-[#355d50]">{order.customerEmail ?? 'Sin correo'}</p></div>
+              <div><p className="text-[10px] font-bold uppercase tracking-wider text-[#8aa097]">Ingresó</p><p className="mt-1 text-sm font-bold text-[#355d50]">{order.enteredBy}</p></div>
+            </div>}
+          </CardContent>
+        </Card>
+        <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Trazabilidad</CardTitle></CardHeader>
+          <CardContent className="space-y-4"><TimelineItem title="Orden creada" detail={`Ingreso registrado por ${order.enteredBy}`} time={shortDate(order.createdAt)} /><TimelineItem title={statusMeta[order.status]?.label ?? order.status} detail={`Última acción por ${order.lastActionBy}`} time={shortDate(order.updatedAt)} current /></CardContent>
+        </Card>
+      </div>
+      <div className="space-y-5">
+        <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Resumen de pago</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex items-end justify-between border-b border-[#e7e8df] pb-4"><span className="max-w-[65%] text-xs text-[#789087]">{order.serviceName}</span><strong data-testid="text-order-price" className="display-font text-2xl text-[#285c4d]">{money(order.price)}</strong></div>
+            {order.paymentMethod ? <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#e4efe9] p-3 text-xs font-bold text-[#2d765e]"><Check size={15} /> Pagado con {methodLabel(order.paymentMethod)}</div> : <div className="mt-4 space-y-3"><Label htmlFor="payment-method">Registrar pago en caja</Label><select id="payment-method" data-testid="select-payment-method" value={paymentMethod} onChange={event => setPaymentMethod(event.target.value as typeof paymentMethod)} className="h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]"><option value="EFECTIVO">Efectivo</option><option value="DEBITO">Débito</option><option value="CREDITO">Crédito</option></select><Button type="button" data-testid="button-record-payment" disabled={recordPayment.isPending} onClick={pay} className="h-10 w-full rounded-xl bg-[#f0bd3e] font-bold text-[#173a32] hover:bg-[#e4ad2d]">{recordPayment.isPending ? 'Registrando…' : 'Registrar pago'} <CircleDollarSign size={15} /></Button></div>}
+          </CardContent>
+        </Card>
+        <Card className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Comprobante y código de barras</CardTitle><p className="text-xs text-[#789087]">El cliente puede mostrar este código en su teléfono.</p></CardHeader>
+          <CardContent>
+            <div className="rounded-xl border border-dashed border-[#cbd9cf] bg-[#f4f5ec] p-4 text-center">
+              <img data-testid="img-order-barcode" src={`/api/orders/${order.id}/barcode.png`} alt={`Código de barras ${order.barcode}`} className="mx-auto block h-auto w-full max-w-[360px]" />
+              <p data-testid="text-order-barcode" className="mono mt-2 text-xs tracking-[.2em] text-[#355d50]">{order.barcode}</p>
+            </div>
+            <div data-testid="status-receipt-email" className={`mt-3 rounded-xl p-3 text-xs ${order.receiptEmailStatus === 'ENVIADO' ? 'bg-[#e4efe9] text-[#2d765e]' : order.receiptEmailStatus === 'FALLIDO' ? 'bg-[#fff1eb] text-[#a64a30]' : 'bg-[#f4f5ec] text-[#668279]'}`}>
+              {order.receiptEmailStatus === 'ENVIADO' ? `Comprobante enviado a ${order.customerEmail}${order.receiptSentAt ? ` · ${shortDate(order.receiptSentAt)}` : ''}` : order.receiptEmailStatus === 'FALLIDO' ? `No se pudo enviar a ${order.customerEmail}.` : order.receiptEmailStatus === 'ENVIANDO' ? `Enviando a ${order.customerEmail}…` : order.customerEmail ? `Se enviará a ${order.customerEmail} al registrar la orden.` : 'Agrega el correo del cliente para enviarle el comprobante.'}
+            </div>
+            {order.customerEmail && (order.receiptEmailStatus === 'FALLIDO' || order.receiptEmailStatus === 'NO_ENVIADO') && <Button type="button" data-testid="button-retry-receipt" disabled={sendReceipt.isPending} onClick={retryReceipt} className="mt-3 h-10 w-full rounded-xl bg-[#1e6b58] text-xs font-bold text-white">{sendReceipt.isPending ? 'Enviando…' : order.receiptEmailStatus === 'FALLIDO' ? 'Reintentar envío' : 'Enviar comprobante'} <Mail size={15} /></Button>}
+            <Button type="button" data-testid="button-print-barcode" variant="outline" onClick={() => window.print()} className="mt-3 h-10 w-full rounded-xl border-[#ccd9d1] text-xs font-bold text-[#285c4d]"><Printer size={15} /> Imprimir comprobante</Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  </div>;
 }
 
 function TimelineItem({ title, detail, time, current = false }: { title: string; detail: string; time: string; current?: boolean }) { return <div className="flex gap-3"><span className={`mt-1 h-2.5 w-2.5 rounded-full ${current ? 'bg-[#f0bd3e] ring-4 ring-[#fff0c9]' : 'bg-[#4d9d7b]'}`} /><div className="flex-1"><div className="flex justify-between gap-3"><p className="text-xs font-bold text-[#355d50]">{title}</p><span className="text-[10px] text-[#8aa097]">{time}</span></div><p className="mt-1 text-xs text-[#789087]">{detail}</p></div></div>; }

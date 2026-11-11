@@ -36,6 +36,7 @@ Software de ventas, operación y control de caja para una empresa de lavado de a
 - Development preview supports an explicitly labeled demo path so the owner can review the portal before inviting the supervisor.
 - Prices are copied onto each order at intake, preserving the historical sale value even if the service catalog changes later.
 - Services have separate prices for small, medium, and large vehicles; removing a service pauses it for future orders without deleting it or changing past orders.
+- Order operations are tracked as Entrada, En puente, and Servicio finalizado; payments are recorded at the counter with cash, debit, or credit rather than charged online.
 - SII readiness is represented in the settings surface, while live electronic document emission remains a separate integration step.
 
 ## Product
