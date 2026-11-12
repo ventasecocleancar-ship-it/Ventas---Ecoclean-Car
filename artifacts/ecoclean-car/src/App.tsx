@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 import { Link, Redirect, Route, Switch, useLocation, useParams, Router as WouterRouter } from 'wouter';
 import {
-  AuditEventSeverity, OrderStatus, PaymentMethod, ServiceCategory, VehicleSize,
+  AuditEventSeverity, DiscountType, OrderStatus, PaymentMethod, ServiceCategory, VehicleSize,
   type AuditEvent, type Dashboard, type Order, type Service,
   getGetAuditEventsQueryKey, getGetDashboardQueryKey, getGetOrderByBarcodeQueryKey, getGetOrderQueryKey, getGetOrdersQueryKey,
-  getGetBootstrapStatusQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteService, useDeleteUser,
+  getGetBootstrapStatusQueryKey, getGetNotificationSettingsQueryKey, getGetServicesQueryKey, getGetUsersQueryKey, useCreateOrder, useCreateService, useDeleteService, useDeleteUser,
   useGetAuditEvents, useGetBootstrapStatus, useGetDashboard, useGetOrder, useGetOrders, useGetServices, useGetUsers,
-  useGetOrderByBarcode, useInviteUser, useRecordPayment, useSendOrderReceipt, useUpdateOrder, useUpdateOrderStatus,
+  useGetOrderByBarcode, useGetNotificationSettings, useInviteUser, useRecordPayment, useSendBackupNotification, useSendOrderReceipt, useUpdateNotificationSettings, useUpdateOrder, useUpdateOrderStatus,
   useUpdateService, type UserAccount, UserRole,
 } from '@workspace/api-client-react';
 import { ErrorBoundary } from '@/components/error-boundary';
@@ -105,10 +105,10 @@ const demoServices: Service[] = [
   { id: 3, name: 'Detalle premium', description: 'Terminación fina, llantas y protección.', category: ServiceCategory.ESPECIALIZADO, price: 24900, priceSmall: 24900, priceMedium: 24900, priceLarge: 24900, active: true },
 ];
 const demoOrders: Order[] = [
-  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 2, serviceName: 'Interior + exterior', vehicleSize: VehicleSize.MEDIANO, price: 14900, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
-  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
-  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 3, serviceName: 'Detalle premium', vehicleSize: VehicleSize.MEDIANO, price: 24900, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
-  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, price: 8900, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
+  { id: 1, number: 'EC-1048', plate: 'KJ-PD-42', customer: 'Camila Rojas', phone: '+56 9 6218 4420', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 2, serviceName: 'Interior + exterior', vehicleSize: VehicleSize.MEDIANO, subtotal: 14900, discountType: null, discountValue: null, discountAmount: 0, price: 14900, backupNotificationStatus: 'NO_CONFIGURADO', backupNotificationEmail: null, backupNotifiedAt: null, status: OrderStatus.PENDIENTE_DE_PAGO, createdAt: new Date(Date.now() - 38 * 60000).toISOString(), updatedAt: new Date(Date.now() - 8 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10480001' },
+  { id: 2, number: 'EC-1047', plate: 'LZ-RB-81', customer: 'Rodrigo Vidal', phone: '+56 9 7964 1211', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, subtotal: 8900, discountType: null, discountValue: null, discountAmount: 0, price: 8900, backupNotificationStatus: 'NO_CONFIGURADO', backupNotificationEmail: null, backupNotifiedAt: null, status: OrderStatus.LISTO, createdAt: new Date(Date.now() - 65 * 60000).toISOString(), updatedAt: new Date(Date.now() - 21 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10470001' },
+  { id: 3, number: 'EC-1046', plate: 'PV-TC-66', customer: 'Alonso Mena', phone: '+56 9 5620 3818', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 3, serviceName: 'Detalle premium', vehicleSize: VehicleSize.MEDIANO, subtotal: 24900, discountType: null, discountValue: null, discountAmount: 0, price: 24900, backupNotificationStatus: 'NO_CONFIGURADO', backupNotificationEmail: null, backupNotifiedAt: null, status: OrderStatus.EN_SERVICIO, createdAt: new Date(Date.now() - 91 * 60000).toISOString(), updatedAt: new Date(Date.now() - 30 * 60000).toISOString(), enteredBy: 'Paula Díaz', lastActionBy: 'Diego M.', paymentMethod: null, barcode: 'EC10460001' },
+  { id: 4, number: 'EC-1045', plate: 'HX-LK-09', customer: 'Nicolás Vera', phone: '+56 9 5112 7432', customerEmail: null, receiptEmailStatus: 'NO_ENVIADO', receiptSentAt: null, serviceId: 1, serviceName: 'Lavado eco exterior', vehicleSize: VehicleSize.MEDIANO, subtotal: 8900, discountType: null, discountValue: null, discountAmount: 0, price: 8900, backupNotificationStatus: 'NO_CONFIGURADO', backupNotificationEmail: null, backupNotifiedAt: null, status: OrderStatus.ENTREGADO, createdAt: new Date(Date.now() - 160 * 60000).toISOString(), updatedAt: new Date(Date.now() - 22 * 60000).toISOString(), enteredBy: 'Martina Soto', lastActionBy: 'Martina Soto', paymentMethod: PaymentMethod.EFECTIVO, barcode: 'EC10450001' },
 ];
 const demoAudit: AuditEvent[] = [
   { id: 1, action: 'ORDER_STATUS_CHANGED', description: 'EC-1048 pasó a Pendiente de pago', actor: 'Diego M.', timestamp: new Date(Date.now() - 8 * 60000).toISOString(), severity: AuditEventSeverity.INFO },
@@ -332,6 +332,8 @@ function NewOrderPage() {
   const [form, setForm] = useState({ plate: '', customer: '', phone: '', email: '', priceOverride: '' });
   const [selectedServiceIds, setSelectedServiceIds] = useState<number[]>([]);
   const [vehicleSize, setVehicleSize] = useState<typeof VehicleSize[keyof typeof VehicleSize]>(VehicleSize.MEDIANO);
+  const [discountType, setDiscountType] = useState<typeof DiscountType[keyof typeof DiscountType] | ''>('');
+  const [discountValue, setDiscountValue] = useState('');
   const [initialServiceSelected, setInitialServiceSelected] = useState(false);
   const [serviceSearch, setServiceSearch] = useState('');
   const [error, setError] = useState('');
@@ -355,7 +357,11 @@ function NewOrderPage() {
     .map(id => activeServices.find(service => service.id === id))
     .filter((service): service is Service => Boolean(service));
   const subtotal = selectedServices.reduce((sum, service) => sum + servicePrice(service, vehicleSize), 0);
-  const total = form.priceOverride ? Number(form.priceOverride) : subtotal;
+  const discountInput = Number(discountValue) || 0;
+  const estimatedDiscount = discountType === DiscountType.PORCENTAJE
+    ? Math.min(subtotal, Math.round(subtotal * Math.min(discountInput, 100) / 100))
+    : discountType === DiscountType.MONTO ? Math.min(subtotal, discountInput) : 0;
+  const total = Math.max(0, (form.priceOverride ? Number(form.priceOverride) : subtotal) - estimatedDiscount);
   const toggleService = (id: number) => {
     setSelectedServiceIds(current => current.includes(id) ? current.filter(serviceId => serviceId !== id) : [...current, id]);
     setError('');
@@ -364,6 +370,12 @@ function NewOrderPage() {
     event.preventDefault();
     if (!form.plate || !form.customer || !form.phone || selectedServices.length === 0) {
       setError('Completa los datos del cliente y selecciona al menos un servicio.');
+      return;
+    }
+    if (discountType && (!Number.isInteger(discountInput) || discountInput < 1 || (discountType === DiscountType.PORCENTAJE && discountInput > 100))) {
+      setError(discountType === DiscountType.PORCENTAJE
+        ? 'Ingresa un porcentaje entero entre 1 y 100.'
+        : 'Ingresa un descuento entero en pesos mayor que cero.');
       return;
     }
     setError('');
@@ -376,6 +388,8 @@ function NewOrderPage() {
         serviceIds: selectedServices.map(service => service.id),
         vehicleSize,
         priceOverride: form.priceOverride ? Number(form.priceOverride) : null,
+         discountType: discountType || null,
+         discountValue: discountType ? discountInput : null,
       },
     }, {
       onSuccess: (order) => {
@@ -446,8 +460,18 @@ function NewOrderPage() {
             {selectedServices.length ? <div className="space-y-2">{selectedServices.map(service => <div key={service.id} className="flex justify-between gap-3 text-xs"><span className="text-[#668279]">{service.name}</span><span className="font-semibold text-[#355d50]">{money(servicePrice(service, vehicleSize))}</span></div>)}</div> : <p className="text-xs text-[#789087]">Selecciona al menos un servicio.</p>}
             <div className="mt-3 flex items-center justify-between border-t border-[#c9ddd0] pt-3"><span className="text-xs font-bold text-[#355d50]">Subtotal</span><strong data-testid="text-order-service-subtotal" className="text-sm font-bold text-[#285c4d]">{money(subtotal)}</strong></div>
           </div>
+          <div className="rounded-xl border border-[#e1e5dc] bg-[#f4f5ec] p-4">
+            <div className="mb-3"><p className="text-xs font-bold text-[#355d50]">Descuento</p><p className="mt-1 text-[10px] leading-4 text-[#789087]">El total definitivo y el descuento aplicado los calcula el sistema al registrar.</p></div>
+            <div className="grid grid-cols-[1fr_1.15fr] gap-2">
+              <select aria-label="Tipo de descuento" data-testid="select-order-discount-type" value={discountType} onChange={event => { setDiscountType(event.target.value as typeof discountType); if (!event.target.value) setDiscountValue(''); }} className="h-10 rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-xs font-semibold text-[#355d50]">
+                <option value="">Sin descuento</option><option value={DiscountType.PORCENTAJE}>Porcentaje</option><option value={DiscountType.MONTO}>Monto en CLP</option>
+              </select>
+              <Input data-testid="input-order-discount-value" aria-label={discountType === DiscountType.PORCENTAJE ? 'Porcentaje de descuento' : 'Monto de descuento en pesos'} type="number" min="1" max={discountType === DiscountType.PORCENTAJE ? 100 : undefined} step="1" disabled={!discountType} value={discountValue} onChange={event => setDiscountValue(event.target.value.replace(/[^\d]/g, ''))} placeholder={discountType === DiscountType.PORCENTAJE ? 'Ej. 10 %' : 'Monto CLP'} className="h-10 bg-[#fbf8ef]" />
+            </div>
+            {discountType && <p className="mt-2 text-[10px] text-[#668279]">Descuento estimado: <strong data-testid="text-order-discount-preview" className="text-[#285c4d]">{money(estimatedDiscount)}</strong>{discountType === DiscountType.PORCENTAJE ? ` · ${Math.min(discountInput, 100)} %` : ''}</p>}
+          </div>
           <div><Label htmlFor="priceOverride">Total acordado <span className="font-normal text-[#8aa097]">(opcional)</span></Label><Input id="priceOverride" data-testid="input-order-price" type="number" min="0" value={form.priceOverride} onChange={e => update('priceOverride', e.target.value)} placeholder={String(subtotal)} className="mt-2 h-11 bg-[#fbf8ef]" /></div>
-          <div className="flex items-end justify-between rounded-xl bg-[#173a32] px-4 py-3 text-[#fbf5e8]"><span className="text-xs font-semibold text-[#d5e5dc]">{form.priceOverride ? 'Total acordado' : 'Total del servicio'}</span><strong data-testid="text-order-service-total" className="display-font text-2xl">{money(total)}</strong></div>
+          <div className="flex items-end justify-between rounded-xl bg-[#173a32] px-4 py-3 text-[#fbf5e8]"><span className="text-xs font-semibold text-[#d5e5dc]">{form.priceOverride ? 'Total acordado · estimado' : 'Total estimado'}</span><strong data-testid="text-order-service-total" className="display-font text-2xl">{money(total)}</strong></div>
           {error && <p data-testid="status-order-error" className="rounded-lg bg-[#f9e3d9] px-3 py-2 text-xs font-semibold text-[#a64a30]">{error}</p>}
           <Button type="submit" data-testid="button-create-order" disabled={create.isPending || servicesQuery.isLoading} className="h-11 w-full rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]">{create.isPending ? 'Guardando…' : 'Registrar ingreso'} <ArrowRight size={16} /></Button>
           <p className="text-center text-[10px] leading-4 text-[#8aa097]">Al registrar, se crea el ticket con los servicios seleccionados y el total calculado.</p>
@@ -465,6 +489,7 @@ function OrderDetailPage() {
   const updateStatus = useUpdateOrderStatus();
   const recordPayment = useRecordPayment();
   const sendReceipt = useSendOrderReceipt();
+  const sendBackup = useSendBackupNotification();
   const updateOrder = useUpdateOrder();
   const [paymentMethod, setPaymentMethod] = useState<'EFECTIVO' | 'DEBITO' | 'CREDITO'>('EFECTIVO');
   const [editMode, setEditMode] = useState(false);
@@ -513,6 +538,18 @@ function OrderDetailPage() {
         setNotice(next.receiptEmailStatus === 'ENVIADO' ? `Comprobante enviado a ${next.customerEmail}.` : 'No se pudo enviar el comprobante. Puedes volver a intentarlo.');
       },
       onError: () => setNotice('No se pudo enviar el comprobante. Revisa la conexión de Gmail e inténtalo otra vez.'),
+    });
+  };
+  const retryBackup = () => {
+    sendBackup.mutate({ id: order.id }, {
+      onSuccess: next => {
+        queryClient.setQueryData(getGetOrderQueryKey(order.id), next);
+        queryClient.invalidateQueries({ queryKey: getGetOrdersQueryKey() });
+        setNotice(next.backupNotificationStatus === 'ENVIADO'
+          ? `Aviso de servicio finalizado enviado a ${next.backupNotificationEmail ?? 'el correo de respaldo'}.`
+          : 'No se pudo enviar el aviso. Puedes volver a intentarlo cuando esté disponible.');
+      },
+      onError: () => setNotice('No se pudo enviar el aviso de respaldo. Revisa la configuración e inténtalo nuevamente.'),
     });
   };
   const currentIndex = order.status === OrderStatus.ANULADO ? -1 : statusOrder.indexOf(order.status as Exclude<typeof OrderStatus[keyof typeof OrderStatus], 'ANULADO'>);
@@ -565,8 +602,23 @@ function OrderDetailPage() {
         <Card className="border-[#dfe2d8] bg-[#faf8f0]">
           <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Resumen de pago</CardTitle></CardHeader>
           <CardContent>
-            <div className="flex items-end justify-between border-b border-[#e7e8df] pb-4"><span className="max-w-[65%] text-xs text-[#789087]">{order.serviceName}</span><strong data-testid="text-order-price" className="display-font text-2xl text-[#285c4d]">{money(order.price)}</strong></div>
+            <div className="mb-4 flex items-start justify-between gap-3"><div><p className="text-xs font-bold text-[#355d50]">{order.serviceName}</p><p className="mt-1 text-[10px] text-[#8aa097]">{vehicleSizeLabel(order.vehicleSize)} · {order.number}</p></div><span className="rounded-full bg-[#e4efe9] px-2.5 py-1 text-[10px] font-bold text-[#2d765e]">CLP</span></div>
+            <div className="space-y-2 border-b border-[#e7e8df] pb-4 text-xs">
+              <div className="flex justify-between gap-3 text-[#789087]"><span>Subtotal</span><span data-testid="text-order-subtotal">{money(order.subtotal)}</span></div>
+              {order.discountAmount > 0 && <div className="flex justify-between gap-3 text-[#2d765e]"><span>Descuento{order.discountType === DiscountType.PORCENTAJE && order.discountValue !== null ? ` · ${order.discountValue}%` : ''}</span><span data-testid="text-order-discount">− {money(order.discountAmount)}</span></div>}
+            </div>
+            <div className="flex items-end justify-between pt-4"><span className="text-xs font-bold text-[#355d50]">Total a pagar</span><strong data-testid="text-order-price" className="display-font text-2xl text-[#285c4d]">{money(order.price)}</strong></div>
             {order.paymentMethod ? <div className="mt-4 flex items-center gap-2 rounded-xl bg-[#e4efe9] p-3 text-xs font-bold text-[#2d765e]"><Check size={15} /> Pagado con {methodLabel(order.paymentMethod)}</div> : <div className="mt-4 space-y-3"><Label htmlFor="payment-method">Registrar pago en caja</Label><select id="payment-method" data-testid="select-payment-method" value={paymentMethod} onChange={event => setPaymentMethod(event.target.value as typeof paymentMethod)} className="h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]"><option value="EFECTIVO">Efectivo</option><option value="DEBITO">Débito</option><option value="CREDITO">Crédito</option></select><Button type="button" data-testid="button-record-payment" disabled={recordPayment.isPending} onClick={pay} className="h-10 w-full rounded-xl bg-[#f0bd3e] font-bold text-[#173a32] hover:bg-[#e4ad2d]">{recordPayment.isPending ? 'Registrando…' : 'Registrar pago'} <CircleDollarSign size={15} /></Button></div>}
+          </CardContent>
+        </Card>
+        <Card data-testid="card-backup-notification" className="border-[#dfe2d8] bg-[#faf8f0]">
+          <CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Aviso de servicio finalizado</CardTitle><p className="text-xs leading-5 text-[#789087]">Se notifica al correo de respaldo cuando la orden pasa a servicio finalizado.</p></CardHeader>
+          <CardContent>
+            <div data-testid="status-backup-notification" className={`rounded-xl p-3 text-xs ${order.backupNotificationStatus === 'ENVIADO' ? 'bg-[#e4efe9] text-[#2d765e]' : order.backupNotificationStatus === 'FALLIDO' ? 'bg-[#fff1eb] text-[#a64a30]' : 'bg-[#f4f5ec] text-[#668279]'}`}>
+              <p className="font-bold">{order.backupNotificationStatus === 'ENVIADO' ? 'Aviso enviado' : order.backupNotificationStatus === 'ENVIANDO' ? 'Enviando aviso…' : order.backupNotificationStatus === 'FALLIDO' ? 'No se pudo enviar' : order.backupNotificationStatus === 'NO_CONFIGURADO' ? 'Correo de respaldo no configurado' : 'Aviso pendiente'}</p>
+              <p className="mt-1 break-all">{order.backupNotificationEmail ?? 'Sin destinatario registrado'}{order.backupNotifiedAt ? ` · ${shortDate(order.backupNotifiedAt)}` : ''}</p>
+            </div>
+            {order.status === OrderStatus.LISTO && (order.backupNotificationStatus === 'FALLIDO' || order.backupNotificationStatus === 'NO_CONFIGURADO') && <Button type="button" data-testid="button-retry-backup-notification" disabled={sendBackup.isPending} onClick={retryBackup} className="mt-3 h-10 w-full rounded-xl bg-[#1e6b58] text-xs font-bold text-white hover:bg-[#285c4d]">{sendBackup.isPending ? 'Enviando…' : order.backupNotificationStatus === 'FALLIDO' ? 'Reintentar aviso' : 'Enviar aviso'} <Mail size={15} /></Button>}
           </CardContent>
         </Card>
         <Card className="border-[#dfe2d8] bg-[#faf8f0]">
@@ -736,12 +788,22 @@ function AuditPage() {
 
 function SettingsPage() {
   const usersQuery = useGetUsers({ query: { queryKey: getGetUsersQueryKey(), retry: false } });
+  const notificationQuery = useGetNotificationSettings({ query: { queryKey: getGetNotificationSettingsQueryKey(), retry: false } });
   const users = usersQuery.data ?? (usersQuery.isError ? demoUsers : []);
   const invite = useInviteUser();
   const remove = useDeleteUser();
+  const updateNotifications = useUpdateNotificationSettings();
   const [inviteOpen, setInviteOpen] = useState(false);
   const [notice, setNotice] = useState('');
   const [form, setForm] = useState({ email: '', firstName: '', lastName: '', role: UserRole.SUPERVISOR });
+  const [backupEmail, setBackupEmail] = useState('');
+  const [backupEnabled, setBackupEnabled] = useState(false);
+  useEffect(() => {
+    if (notificationQuery.data) {
+      setBackupEmail(notificationQuery.data.backupEmail ?? '');
+      setBackupEnabled(notificationQuery.data.backupNotificationsEnabled);
+    }
+  }, [notificationQuery.data]);
 
   const submitInvite = (event: FormEvent) => {
     event.preventDefault();
@@ -771,11 +833,43 @@ function SettingsPage() {
       onError: () => setNotice('No se pudo eliminar el usuario. Verifica que estés usando una cuenta administradora.'),
     });
   };
+  const saveNotificationSettings = (event: FormEvent) => {
+    event.preventDefault();
+    setNotice('');
+    updateNotifications.mutate({ data: { backupEmail: backupEmail.trim() || null, backupNotificationsEnabled: backupEnabled } }, {
+      onSuccess: settings => {
+        queryClient.setQueryData(getGetNotificationSettingsQueryKey(), settings);
+        queryClient.invalidateQueries({ queryKey: getGetNotificationSettingsQueryKey() });
+        setNotice('Configuración de avisos guardada.');
+      },
+      onError: () => setNotice('No se pudo guardar la configuración de avisos. Revisa el correo e inténtalo nuevamente.'),
+    });
+  };
 
   return <div className="page-in">
-    <PageTitle eyebrow="Control del sistema" title="Configuración" description="Solo el administrador crea y elimina accesos. Las órdenes y auditorías no se borran al retirar a una persona." action={<Button type="button" data-testid="button-invite-user" onClick={() => setInviteOpen(true)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><UserPlus size={17} /> Crear usuario</Button>} />
+    <PageTitle eyebrow="Control del sistema" title="Configuración" description="Administra avisos operativos y accesos del equipo. Cada cambio conserva el historial de la sucursal." action={<Button type="button" data-testid="button-invite-user" onClick={() => setInviteOpen(true)} className="rounded-xl bg-[#1e6b58] font-bold text-[#fbf5e8] hover:bg-[#285c4d]"><UserPlus size={17} /> Crear usuario</Button>} />
     {usersQuery.isError && <PreviewNotice />}
     {notice && <div data-testid="status-user-notice" className="mb-5 rounded-xl border border-[#bcd9c8] bg-[#e4f1e8] px-4 py-3 text-xs font-semibold text-[#2d765e]">{notice}</div>}
+    {notificationQuery.isError && <div data-testid="status-notification-settings-error" role="alert" className="mb-5 flex items-center justify-between rounded-xl border border-[#e8c7bc] bg-[#fff1eb] px-4 py-3 text-xs font-semibold text-[#a64a30]"><span>No se pudo cargar la configuración de avisos.</span><button type="button" data-testid="button-retry-notification-settings" onClick={() => notificationQuery.refetch()} className="font-bold underline">Reintentar</button></div>}
+    <Card className="mb-5 border-[#dfe2d8] bg-[#faf8f0]">
+      <CardHeader><div className="flex items-start gap-3"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#e4efe9] text-[#2f9274]"><Mail size={18} /></span><div><CardTitle className="display-font text-lg text-[#173a32]">Avisos de finalización</CardTitle><p className="mt-1 text-xs leading-5 text-[#789087]">Al marcar una orden como servicio finalizado, EcoClean puede enviar un aviso a un correo de respaldo.</p></div></div></CardHeader>
+      <CardContent>
+        {notificationQuery.isLoading ? <div data-testid="skeleton-notification-settings" className="space-y-3"><div className="h-10 animate-pulse rounded-lg bg-[#e9ece3]" /><div className="h-12 animate-pulse rounded-lg bg-[#e9ece3]" /></div> : <form onSubmit={saveNotificationSettings} className="grid gap-5 md:grid-cols-[1fr_auto] md:items-end">
+          <div>
+            <Label htmlFor="backup-email">Correo de respaldo</Label>
+            <Input id="backup-email" data-testid="input-backup-email" type="email" required={backupEnabled} value={backupEmail} onChange={event => setBackupEmail(event.target.value)} placeholder="operaciones@ecocleancar.cl" className="mt-2 h-11 bg-[#fbf8ef]" />
+            <p className="mt-1 text-[10px] text-[#8aa097]">Este aviso es independiente del comprobante enviado al cliente.</p>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <label htmlFor="backup-enabled" className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-[#e1e5dc] bg-[#f4f5ec] px-3">
+              <input id="backup-enabled" data-testid="checkbox-backup-notifications-enabled" type="checkbox" checked={backupEnabled} onChange={event => setBackupEnabled(event.target.checked)} className="h-4 w-4 accent-[#1e6b58]" />
+              <span className="text-xs font-semibold text-[#355d50]">Enviar avisos de finalización</span>
+            </label>
+            <Button type="submit" data-testid="button-save-notification-settings" disabled={updateNotifications.isPending || notificationQuery.isLoading} className="h-11 rounded-xl bg-[#1e6b58] px-5 font-bold text-[#fbf5e8] hover:bg-[#285c4d]">{updateNotifications.isPending ? 'Guardando…' : 'Guardar avisos'}</Button>
+          </div>
+        </form>}
+      </CardContent>
+    </Card>
     {inviteOpen && <Card className="mb-5 border-[#bdd7c6] bg-[#eef6ef]"><CardHeader className="flex-row items-center justify-between space-y-0"><div><CardTitle className="display-font text-lg text-[#173a32]">Crear acceso de colaborador</CardTitle><p className="text-xs text-[#668279]">Se enviará una invitación. No necesitas conocer ni guardar su contraseña.</p></div><button type="button" data-testid="button-close-invite-form" onClick={() => setInviteOpen(false)}><X size={18} className="text-[#668279]" /></button></CardHeader><CardContent><form onSubmit={submitInvite} className="grid gap-4 md:grid-cols-2"><div><Label htmlFor="user-first-name">Nombre</Label><Input id="user-first-name" data-testid="input-user-first-name" value={form.firstName} onChange={event => setForm({ ...form, firstName: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Nombre" /></div><div><Label htmlFor="user-last-name">Apellido</Label><Input id="user-last-name" data-testid="input-user-last-name" value={form.lastName} onChange={event => setForm({ ...form, lastName: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="Apellido" /></div><div><Label htmlFor="user-email">Correo de trabajo</Label><Input id="user-email" data-testid="input-user-email" type="email" value={form.email} onChange={event => setForm({ ...form, email: event.target.value })} required className="mt-2 bg-[#fbf8ef]" placeholder="colaborador@ecocleancar.cl" /></div><div><Label htmlFor="user-role">Rol</Label><select id="user-role" data-testid="select-user-role" value={form.role} onChange={event => setForm({ ...form, role: event.target.value as typeof form.role })} className="mt-2 h-10 w-full rounded-md border border-[#d7ded5] bg-[#fbf8ef] px-3 text-sm text-[#355d50]"><option value={UserRole.SUPERVISOR}>Supervisor</option><option value={UserRole.CAJERO}>Cajero</option><option value={UserRole.OPERADOR}>Operador</option></select></div><div className="flex gap-3 md:col-span-2"><Button type="submit" data-testid="button-submit-user-invite" disabled={invite.isPending} className="rounded-xl bg-[#1e6b58] font-bold text-white">{invite.isPending ? 'Enviando…' : 'Enviar invitación'} <Mail size={15} /></Button><Button type="button" onClick={() => setInviteOpen(false)} variant="outline" className="rounded-xl border-[#ccd9d1] font-bold text-[#285c4d]">Cancelar</Button></div></form></CardContent></Card>}
     <div className="grid gap-5 xl:grid-cols-[1.1fr_.9fr]">
       <Card className="border-[#dfe2d8] bg-[#faf8f0]"><CardHeader><CardTitle className="display-font text-lg text-[#173a32]">Equipo y permisos</CardTitle><p className="text-xs text-[#789087]">El colaborador activa su cuenta, pero solo tú administra sus accesos.</p></CardHeader><CardContent className="space-y-3">{users.map(account => <TeamRow key={account.id} account={account} onDelete={deleteAccount} disabled={remove.isPending} />)}{!users.length && !usersQuery.isLoading && <p className="rounded-xl border border-dashed border-[#cbd9cf] p-6 text-center text-xs text-[#789087]">No hay usuarios visibles todavía.</p>}</CardContent></Card>

@@ -20,6 +20,12 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get operating dashboard
  */
+export const getDashboardResponseRecentOrdersItemSubtotalMin = 0;
+
+export const getDashboardResponseRecentOrdersItemDiscountValueMin = 0;
+
+export const getDashboardResponseRecentOrdersItemDiscountAmountMin = 0;
+
 export const getDashboardResponseRecentOrdersItemPriceMin = 0;
 
 
@@ -49,7 +55,14 @@ export const GetDashboardResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(getDashboardResponseRecentOrdersItemSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(getDashboardResponseRecentOrdersItemDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(getDashboardResponseRecentOrdersItemDiscountAmountMin),
   "price": zod.number().int().min(getDashboardResponseRecentOrdersItemPriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -227,6 +240,12 @@ export const GetOrdersQueryParams = zod.object({
   "search": zod.coerce.string().optional()
 })
 
+export const getOrdersResponseSubtotalMin = 0;
+
+export const getOrdersResponseDiscountValueMin = 0;
+
+export const getOrdersResponseDiscountAmountMin = 0;
+
 export const getOrdersResponsePriceMin = 0;
 
 
@@ -243,7 +262,14 @@ export const GetOrdersResponseItem = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(getOrdersResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(getOrdersResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(getOrdersResponseDiscountAmountMin),
   "price": zod.number().int().min(getOrdersResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -265,6 +291,8 @@ export const createOrderBodyPlateMin = 2;
 
 export const createOrderBodyPriceOverrideMin = 0;
 
+export const createOrderBodyDiscountValueMin = 0;
+
 
 
 export const CreateOrderBody = zod.object({
@@ -274,8 +302,16 @@ export const CreateOrderBody = zod.object({
   "customerEmail": zod.string().email().nullish(),
   "serviceIds": zod.array(zod.number().int().min(1)).min(1),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
-  "priceOverride": zod.number().int().min(createOrderBodyPriceOverrideMin).nullish()
+  "priceOverride": zod.number().int().min(createOrderBodyPriceOverrideMin).nullish(),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullish(),
+  "discountValue": zod.number().int().min(createOrderBodyDiscountValueMin).nullish()
 })
+
+export const createOrderResponseSubtotalMin = 0;
+
+export const createOrderResponseDiscountValueMin = 0;
+
+export const createOrderResponseDiscountAmountMin = 0;
 
 export const createOrderResponsePriceMin = 0;
 
@@ -293,7 +329,14 @@ export const CreateOrderResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(createOrderResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(createOrderResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(createOrderResponseDiscountAmountMin),
   "price": zod.number().int().min(createOrderResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -311,6 +354,12 @@ export const GetOrderByBarcodeParams = zod.object({
   "barcode": zod.coerce.string()
 })
 
+export const getOrderByBarcodeResponseSubtotalMin = 0;
+
+export const getOrderByBarcodeResponseDiscountValueMin = 0;
+
+export const getOrderByBarcodeResponseDiscountAmountMin = 0;
+
 export const getOrderByBarcodeResponsePriceMin = 0;
 
 
@@ -327,7 +376,14 @@ export const GetOrderByBarcodeResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(getOrderByBarcodeResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(getOrderByBarcodeResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(getOrderByBarcodeResponseDiscountAmountMin),
   "price": zod.number().int().min(getOrderByBarcodeResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -345,6 +401,12 @@ export const GetOrderParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const getOrderResponseSubtotalMin = 0;
+
+export const getOrderResponseDiscountValueMin = 0;
+
+export const getOrderResponseDiscountAmountMin = 0;
+
 export const getOrderResponsePriceMin = 0;
 
 
@@ -361,7 +423,14 @@ export const GetOrderResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(getOrderResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(getOrderResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(getOrderResponseDiscountAmountMin),
   "price": zod.number().int().min(getOrderResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -391,6 +460,12 @@ export const UpdateOrderBody = zod.object({
   "reason": zod.string().nullish()
 })
 
+export const updateOrderResponseSubtotalMin = 0;
+
+export const updateOrderResponseDiscountValueMin = 0;
+
+export const updateOrderResponseDiscountAmountMin = 0;
+
 export const updateOrderResponsePriceMin = 0;
 
 
@@ -407,7 +482,14 @@ export const UpdateOrderResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(updateOrderResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(updateOrderResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(updateOrderResponseDiscountAmountMin),
   "price": zod.number().int().min(updateOrderResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -435,6 +517,12 @@ export const SendOrderReceiptParams = zod.object({
   "id": zod.coerce.number().int()
 })
 
+export const sendOrderReceiptResponseSubtotalMin = 0;
+
+export const sendOrderReceiptResponseDiscountValueMin = 0;
+
+export const sendOrderReceiptResponseDiscountAmountMin = 0;
+
 export const sendOrderReceiptResponsePriceMin = 0;
 
 
@@ -451,7 +539,61 @@ export const SendOrderReceiptResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(sendOrderReceiptResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(sendOrderReceiptResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(sendOrderReceiptResponseDiscountAmountMin),
   "price": zod.number().int().min(sendOrderReceiptResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
+  "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date(),
+  "enteredBy": zod.string(),
+  "lastActionBy": zod.string(),
+  "paymentMethod": zod.union([zod.literal('EFECTIVO'),zod.literal('DEBITO'),zod.literal('CREDITO'),zod.literal(null)]).nullable(),
+  "barcode": zod.string()
+})
+
+
+/**
+ * @summary Send or retry the service completion notification
+ */
+export const SendBackupNotificationParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const sendBackupNotificationResponseSubtotalMin = 0;
+
+export const sendBackupNotificationResponseDiscountValueMin = 0;
+
+export const sendBackupNotificationResponseDiscountAmountMin = 0;
+
+export const sendBackupNotificationResponsePriceMin = 0;
+
+
+
+export const SendBackupNotificationResponse = zod.object({
+  "id": zod.number().int(),
+  "number": zod.string(),
+  "plate": zod.string(),
+  "customer": zod.string(),
+  "phone": zod.string(),
+  "customerEmail": zod.string().email().nullable(),
+  "receiptEmailStatus": zod.enum(['NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "receiptSentAt": zod.coerce.date().nullable(),
+  "serviceId": zod.number().int(),
+  "serviceName": zod.string(),
+  "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(sendBackupNotificationResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(sendBackupNotificationResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(sendBackupNotificationResponseDiscountAmountMin),
+  "price": zod.number().int().min(sendBackupNotificationResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -474,6 +616,12 @@ export const UpdateOrderStatusBody = zod.object({
   "reason": zod.string().nullish()
 })
 
+export const updateOrderStatusResponseSubtotalMin = 0;
+
+export const updateOrderStatusResponseDiscountValueMin = 0;
+
+export const updateOrderStatusResponseDiscountAmountMin = 0;
+
 export const updateOrderStatusResponsePriceMin = 0;
 
 
@@ -490,7 +638,14 @@ export const UpdateOrderStatusResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(updateOrderStatusResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(updateOrderStatusResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(updateOrderStatusResponseDiscountAmountMin),
   "price": zod.number().int().min(updateOrderStatusResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),
@@ -498,6 +653,29 @@ export const UpdateOrderStatusResponse = zod.object({
   "lastActionBy": zod.string(),
   "paymentMethod": zod.union([zod.literal('EFECTIVO'),zod.literal('DEBITO'),zod.literal('CREDITO'),zod.literal(null)]).nullable(),
   "barcode": zod.string()
+})
+
+
+/**
+ * @summary Get backup notification settings
+ */
+export const GetNotificationSettingsResponse = zod.object({
+  "backupEmail": zod.string().email().nullable(),
+  "backupNotificationsEnabled": zod.boolean()
+})
+
+
+/**
+ * @summary Update backup notification settings
+ */
+export const UpdateNotificationSettingsBody = zod.object({
+  "backupEmail": zod.string().email().nullable(),
+  "backupNotificationsEnabled": zod.boolean()
+})
+
+export const UpdateNotificationSettingsResponse = zod.object({
+  "backupEmail": zod.string().email().nullable(),
+  "backupNotificationsEnabled": zod.boolean()
 })
 
 
@@ -517,6 +695,12 @@ export const RecordPaymentBody = zod.object({
   "amount": zod.number().int().min(recordPaymentBodyAmountMin).nullish()
 })
 
+export const recordPaymentResponseSubtotalMin = 0;
+
+export const recordPaymentResponseDiscountValueMin = 0;
+
+export const recordPaymentResponseDiscountAmountMin = 0;
+
 export const recordPaymentResponsePriceMin = 0;
 
 
@@ -533,7 +717,14 @@ export const RecordPaymentResponse = zod.object({
   "serviceId": zod.number().int(),
   "serviceName": zod.string(),
   "vehicleSize": zod.enum(['PEQUENO', 'MEDIANO', 'GRANDE']),
+  "subtotal": zod.number().int().min(recordPaymentResponseSubtotalMin),
+  "discountType": zod.union([zod.literal('PORCENTAJE'),zod.literal('MONTO'),zod.literal(null)]).nullable(),
+  "discountValue": zod.number().int().min(recordPaymentResponseDiscountValueMin).nullable(),
+  "discountAmount": zod.number().int().min(recordPaymentResponseDiscountAmountMin),
   "price": zod.number().int().min(recordPaymentResponsePriceMin),
+  "backupNotificationStatus": zod.enum(['NO_CONFIGURADO', 'NO_ENVIADO', 'ENVIANDO', 'ENVIADO', 'FALLIDO']),
+  "backupNotificationEmail": zod.string().email().nullable(),
+  "backupNotifiedAt": zod.coerce.date().nullable(),
   "status": zod.enum(['INGRESADO', 'EN_SERVICIO', 'LISTO', 'PENDIENTE_DE_PAGO', 'PAGADO', 'ENTREGADO', 'ANULADO']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date(),

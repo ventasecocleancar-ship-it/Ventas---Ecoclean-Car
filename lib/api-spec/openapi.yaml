@@ -244,6 +244,26 @@ paths:
           description: Order has no customer email address
         "404":
           description: Order not found
+  /orders/{id}/backup-notification:
+    post:
+      operationId: sendBackupNotification
+      tags: [orders]
+      summary: Send or retry the service completion notification
+      parameters:
+        - $ref: "#/components/parameters/OrderId"
+      responses:
+        "200":
+          description: Updated notification delivery status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Backup email is not configured
+        "404":
+          description: Order not found
+        "409":
+          description: Notification is already sent or in progress
   /orders/{id}/status:
     post:
       operationId: updateOrderStatus
@@ -264,6 +284,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Order"
+  /settings/notifications:
+    get:
+      operationId: getNotificationSettings
+      tags: [users]
+      summary: Get backup notification settings
+      responses:
+        "200":
+          description: Current backup email configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+    put:
+      operationId: updateNotificationSettings
+      tags: [users]
+      summary: Update backup notification settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSettingsInput"
+      responses:
+        "200":
+          description: Updated backup email configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationSettings"
+        "400":
+          description: Email address is required when notifications are enabled
   /orders/{id}/payment:
     post:
       operationId: recordPayment
@@ -419,12 +470,18 @@ components:
     ReceiptEmailStatus:
       type: string
       enum: [NO_ENVIADO, ENVIANDO, ENVIADO, FALLIDO]
+    BackupNotificationStatus:
+      type: string
+      enum: [NO_CONFIGURADO, NO_ENVIADO, ENVIANDO, ENVIADO, FALLIDO]
+    DiscountType:
+      type: string
+      enum: [PORCENTAJE, MONTO]
     PaymentMethod:
       type: string
       enum: [EFECTIVO, DEBITO, CREDITO]
     Order:
       type: object
-      required: [id, number, plate, customer, phone, customerEmail, receiptEmailStatus, receiptSentAt, serviceId, serviceName, vehicleSize, price, status, createdAt, updatedAt, enteredBy, lastActionBy, paymentMethod, barcode]
+      required: [id, number, plate, customer, phone, customerEmail, receiptEmailStatus, receiptSentAt, serviceId, serviceName, vehicleSize, subtotal, discountType, discountValue, discountAmount, price, backupNotificationStatus, backupNotificationEmail, backupNotifiedAt, status, createdAt, updatedAt, enteredBy, lastActionBy, paymentMethod, barcode]
       properties:
         id: { type: integer }
         number: { type: string }
@@ -439,7 +496,17 @@ components:
         serviceName: { type: string }
         vehicleSize:
           $ref: "#/components/schemas/VehicleSize"
+        subtotal: { type: integer, minimum: 0 }
+        discountType:
+          type: ["string", "null"]
+          enum: [PORCENTAJE, MONTO, null]
+        discountValue: { type: ["integer", "null"], minimum: 0 }
+        discountAmount: { type: integer, minimum: 0 }
         price: { type: integer, minimum: 0 }
+        backupNotificationStatus:
+          $ref: "#/components/schemas/BackupNotificationStatus"
+        backupNotificationEmail: { type: ["string", "null"], format: email }
+        backupNotifiedAt: { type: ["string", "null"], format: date-time }
         status:
           $ref: "#/components/schemas/OrderStatus"
         createdAt: { type: string, format: date-time }
@@ -466,6 +533,10 @@ components:
         vehicleSize:
           $ref: "#/components/schemas/VehicleSize"
         priceOverride: { type: ["integer", "null"], minimum: 0 }
+        discountType:
+          type: ["string", "null"]
+          enum: [PORCENTAJE, MONTO, null]
+        discountValue: { type: ["integer", "null"], minimum: 0 }
     OrderUpdate:
       type: object
       properties:
@@ -481,6 +552,18 @@ components:
         status:
           $ref: "#/components/schemas/OrderStatus"
         reason: { type: ["string", "null"] }
+    NotificationSettings:
+      type: object
+      required: [backupEmail, backupNotificationsEnabled]
+      properties:
+        backupEmail: { type: ["string", "null"], format: email }
+        backupNotificationsEnabled: { type: boolean }
+    NotificationSettingsInput:
+      type: object
+      required: [backupEmail, backupNotificationsEnabled]
+      properties:
+        backupEmail: { type: ["string", "null"], format: email }
+        backupNotificationsEnabled: { type: boolean }
     PaymentInput:
       type: object
       required: [method]

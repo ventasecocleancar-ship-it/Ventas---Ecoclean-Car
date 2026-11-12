@@ -94,6 +94,25 @@ export const ReceiptEmailStatus = {
   FALLIDO: 'FALLIDO',
 } as const;
 
+export type BackupNotificationStatus = typeof BackupNotificationStatus[keyof typeof BackupNotificationStatus];
+
+
+export const BackupNotificationStatus = {
+  NO_CONFIGURADO: 'NO_CONFIGURADO',
+  NO_ENVIADO: 'NO_ENVIADO',
+  ENVIANDO: 'ENVIANDO',
+  ENVIADO: 'ENVIADO',
+  FALLIDO: 'FALLIDO',
+} as const;
+
+export type DiscountType = typeof DiscountType[keyof typeof DiscountType];
+
+
+export const DiscountType = {
+  PORCENTAJE: 'PORCENTAJE',
+  MONTO: 'MONTO',
+} as const;
+
 export type PaymentMethod = typeof PaymentMethod[keyof typeof PaymentMethod];
 
 
@@ -101,6 +120,17 @@ export const PaymentMethod = {
   EFECTIVO: 'EFECTIVO',
   DEBITO: 'DEBITO',
   CREDITO: 'CREDITO',
+} as const;
+
+/**
+ * @nullable
+ */
+export type OrderDiscountType = typeof OrderDiscountType[keyof typeof OrderDiscountType] | null;
+
+
+export const OrderDiscountType = {
+  PORCENTAJE: 'PORCENTAJE',
+  MONTO: 'MONTO',
 } as const;
 
 /**
@@ -130,7 +160,23 @@ export interface Order {
   serviceName: string;
   vehicleSize: VehicleSize;
   /** @minimum 0 */
+  subtotal: number;
+  /** @nullable */
+  discountType: OrderDiscountType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  discountValue: number | null;
+  /** @minimum 0 */
+  discountAmount: number;
+  /** @minimum 0 */
   price: number;
+  backupNotificationStatus: BackupNotificationStatus;
+  /** @nullable */
+  backupNotificationEmail: string | null;
+  /** @nullable */
+  backupNotifiedAt: string | null;
   status: OrderStatus;
   createdAt: string;
   updatedAt: string;
@@ -140,6 +186,17 @@ export interface Order {
   paymentMethod: OrderPaymentMethod;
   barcode: string;
 }
+
+/**
+ * @nullable
+ */
+export type OrderInputDiscountType = typeof OrderInputDiscountType[keyof typeof OrderInputDiscountType] | null;
+
+
+export const OrderInputDiscountType = {
+  PORCENTAJE: 'PORCENTAJE',
+  MONTO: 'MONTO',
+} as const;
 
 export interface OrderInput {
   /** @minLength 2 */
@@ -160,6 +217,13 @@ export interface OrderInput {
      * @nullable
      */
   priceOverride?: number | null;
+  /** @nullable */
+  discountType?: OrderInputDiscountType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  discountValue?: number | null;
 }
 
 export interface OrderUpdate {
@@ -180,6 +244,18 @@ export interface OrderStatusInput {
   status: OrderStatus;
   /** @nullable */
   reason?: string | null;
+}
+
+export interface NotificationSettings {
+  /** @nullable */
+  backupEmail: string | null;
+  backupNotificationsEnabled: boolean;
+}
+
+export interface NotificationSettingsInput {
+  /** @nullable */
+  backupEmail: string | null;
+  backupNotificationsEnabled: boolean;
 }
 
 export interface PaymentInput {

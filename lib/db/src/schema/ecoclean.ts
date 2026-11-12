@@ -51,12 +51,26 @@ export const orders = pgTable("ecoclean_orders", {
     .references(() => services.id),
   serviceName: text("service_name").notNull(),
   vehicleSize: text("vehicle_size").notNull().default("MEDIANO"),
+  subtotal: integer("subtotal"),
+  discountType: text("discount_type"),
+  discountValue: integer("discount_value"),
+  discountAmount: integer("discount_amount").notNull().default(0),
   price: integer("price").notNull(),
+  backupNotificationStatus: text("backup_notification_status").notNull().default("NO_CONFIGURADO"),
+  backupNotificationEmail: text("backup_notification_email"),
+  backupNotifiedAt: timestamp("backup_notified_at", { withTimezone: true }),
   status: orderStatusEnum("status").notNull().default("INGRESADO"),
   paymentMethod: paymentMethodEnum("payment_method"),
   enteredBy: text("entered_by").notNull().default("Supervisor de sucursal"),
   lastActionBy: text("last_action_by").notNull().default("Supervisor de sucursal"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const notificationSettings = pgTable("ecoclean_notification_settings", {
+  id: integer("id").primaryKey().default(1),
+  backupEmail: text("backup_email"),
+  backupNotificationsEnabled: boolean("backup_notifications_enabled").notNull().default(false),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

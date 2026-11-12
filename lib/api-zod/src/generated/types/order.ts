@@ -5,6 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { BackupNotificationStatus } from './backupNotificationStatus';
+import type { OrderDiscountType } from './orderDiscountType';
 import type { OrderPaymentMethod } from './orderPaymentMethod';
 import type { OrderStatus } from './orderStatus';
 import type { ReceiptEmailStatus } from './receiptEmailStatus';
@@ -25,7 +27,23 @@ export interface Order {
   serviceName: string;
   vehicleSize: VehicleSize;
   /** @minimum 0 */
+  subtotal: number;
+  /** @nullable */
+  discountType: OrderDiscountType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  discountValue: number | null;
+  /** @minimum 0 */
+  discountAmount: number;
+  /** @minimum 0 */
   price: number;
+  backupNotificationStatus: BackupNotificationStatus;
+  /** @nullable */
+  backupNotificationEmail: string | null;
+  /** @nullable */
+  backupNotifiedAt: Date | null;
   status: OrderStatus;
   createdAt: Date;
   updatedAt: Date;

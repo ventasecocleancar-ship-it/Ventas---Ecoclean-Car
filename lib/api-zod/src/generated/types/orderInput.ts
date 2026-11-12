@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { OrderInputDiscountType } from './orderInputDiscountType';
 import type { VehicleSize } from './vehicleSize';
 
 export interface OrderInput {
@@ -26,4 +27,11 @@ export interface OrderInput {
      * @nullable
      */
   priceOverride?: number | null;
+  /** @nullable */
+  discountType?: OrderInputDiscountType;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  discountValue?: number | null;
 }

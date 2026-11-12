@@ -10,15 +10,18 @@ import {
   UpdateServiceBody,
   UpdateOrderBody,
   UpdateOrderStatusBody,
+  UpdateNotificationSettingsBody,
 } from "@workspace/api-zod";
 import { db } from "@workspace/db";
 import {
   createOrderBarcodePng,
   orderBarcode,
+  sendBackupServiceCompletedNotification,
   sendOrderReceipt,
 } from "../lib/order-receipt";
 import {
   auditEvents,
+  notificationSettings,
   orders,
   services,
   type AuditEvent,
@@ -42,6 +45,10 @@ type PaymentMethod = (typeof paymentMethods)[number];
 type OrderStatus = (typeof statuses)[number];
 const receiptEmailStatuses = ["NO_ENVIADO", "ENVIANDO", "ENVIADO", "FALLIDO"] as const;
 type ReceiptEmailStatus = (typeof receiptEmailStatuses)[number];
+const discountTypes = ["PORCENTAJE", "MONTO"] as const;
+type DiscountType = (typeof discountTypes)[number];
+const backupNotificationStatuses = ["NO_CONFIGURADO", "NO_ENVIADO", "ENVIANDO", "ENVIADO", "FALLIDO"] as const;
+type BackupNotificationStatus = (typeof backupNotificationStatuses)[number];
 const userRoles = ["ADMIN", "SUPERVISOR", "CAJERO", "OPERADOR"] as const;
 type UserRole = (typeof userRoles)[number];
 const serviceCategories = ["LAVADO", "ADICIONAL", "ESPECIALIZADO", "GENERAL"] as const;
@@ -176,7 +183,18 @@ function serializeOrder(order: Order) {
     vehicleSize: (vehicleSizes.includes(order.vehicleSize as VehicleSize)
       ? order.vehicleSize
       : "MEDIANO") as VehicleSize,
+    subtotal: order.subtotal ?? order.price,
+    discountType: (discountTypes.includes(order.discountType as DiscountType)
+      ? order.discountType
+      : null) as DiscountType | null,
+    discountValue: order.discountValue ?? null,
+    discountAmount: order.discountAmount ?? 0,
     price: order.price,
+    backupNotificationStatus: (backupNotificationStatuses.includes(order.backupNotificationStatus as BackupNotificationStatus)
+      ? order.backupNotificationStatus
+      : "NO_CONFIGURADO") as BackupNotificationStatus,
+    backupNotificationEmail: order.backupNotificationEmail,
+    backupNotifiedAt: order.backupNotifiedAt?.toISOString() ?? null,
     status: order.status as OrderStatus,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
@@ -184,6 +202,13 @@ function serializeOrder(order: Order) {
     lastActionBy: order.lastActionBy,
     paymentMethod: order.paymentMethod as PaymentMethod | null,
     barcode: orderNumber(order.id),
+  };
+}
+
+function serializeNotificationSettings(settings?: typeof notificationSettings.$inferSelect) {
+  return {
+    backupEmail: settings?.backupEmail ?? null,
+    backupNotificationsEnabled: settings?.backupNotificationsEnabled ?? false,
   };
 }
 
@@ -281,6 +306,91 @@ async function deliverOrderReceipt(orderId: number, actor: string, req: Request)
     actor,
     "COMPROBANTE_ENVIADO",
     `Comprobante enviado para la orden ${orderNumber(orderId)}`,
+    orderId,
+  );
+  return sent ?? null;
+}
+
+async function deliverBackupNotification(orderId: number, actor: string, req: Request) {
+  const [settings] = await db.select().from(notificationSettings).limit(1);
+  if (!settings?.backupNotificationsEnabled || !settings.backupEmail) {
+    const [notConfigured] = await db
+      .update(orders)
+      .set({
+        backupNotificationStatus: "NO_CONFIGURADO",
+        backupNotificationEmail: null,
+        backupNotifiedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    await addAudit(
+      actor,
+      "AVISO_RESPALDO_SIN_CONFIGURAR",
+      `No se envió el aviso de respaldo para la orden ${orderNumber(orderId)}`,
+      orderId,
+      "WARNING",
+    );
+    return notConfigured ?? null;
+  }
+
+  const [sending] = await db
+    .update(orders)
+    .set({
+      backupNotificationStatus: "ENVIANDO",
+      backupNotificationEmail: settings.backupEmail,
+      backupNotifiedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(orders.id, orderId),
+      eq(orders.status, "LISTO"),
+      inArray(orders.backupNotificationStatus, ["NO_CONFIGURADO", "NO_ENVIADO", "FALLIDO"]),
+    ))
+    .returning();
+  if (!sending) {
+    const [current] = await db.select().from(orders).where(eq(orders.id, orderId)).limit(1);
+    return current ?? null;
+  }
+
+  try {
+    await sendBackupServiceCompletedNotification(sending, settings.backupEmail);
+  } catch (error) {
+    req.log.error({ orderId, err: error }, "Backup service notification failed");
+    const [failed] = await db
+      .update(orders)
+      .set({
+        backupNotificationStatus: "FALLIDO",
+        backupNotificationEmail: settings.backupEmail,
+        backupNotifiedAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(orders.id, orderId))
+      .returning();
+    await addAudit(
+      actor,
+      "AVISO_RESPALDO_FALLIDO",
+      `No se pudo enviar el aviso de respaldo para la orden ${orderNumber(orderId)}`,
+      orderId,
+      "WARNING",
+    );
+    return failed ?? null;
+  }
+
+  const [sent] = await db
+    .update(orders)
+    .set({
+      backupNotificationStatus: "ENVIADO",
+      backupNotificationEmail: settings.backupEmail,
+      backupNotifiedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, orderId))
+    .returning();
+  await addAudit(
+    actor,
+    "AVISO_RESPALDO_ENVIADO",
+    `Aviso de servicio finalizado enviado para la orden ${orderNumber(orderId)}`,
     orderId,
   );
   return sent ?? null;
@@ -525,7 +635,7 @@ router.post("/orders", async (req, res) => {
     return;
   }
   const serviceName = selectedServices.map((service) => service.name).join(" + ");
-  const subtotal = selectedServices.reduce((sum, service) => {
+  const catalogSubtotal = selectedServices.reduce((sum, service) => {
     const servicePrice = input.vehicleSize === "PEQUENO"
       ? service.priceSmall ?? service.price
       : input.vehicleSize === "GRANDE"
@@ -533,7 +643,29 @@ router.post("/orders", async (req, res) => {
         : service.priceMedium ?? service.price;
     return sum + servicePrice;
   }, 0);
-  const price = input.priceOverride ?? subtotal;
+  const subtotal = input.priceOverride ?? catalogSubtotal;
+  const requestedDiscountType = input.discountType ?? null;
+  const requestedDiscountValue = input.discountValue ?? null;
+  if ((requestedDiscountType === null) !== (requestedDiscountValue === null)) {
+    res.status(400).json({ error: "Selecciona el tipo y el valor del descuento" });
+    return;
+  }
+  if (requestedDiscountType === "PORCENTAJE" && (requestedDiscountValue! < 0 || requestedDiscountValue! > 100)) {
+    res.status(400).json({ error: "El descuento porcentual debe estar entre 0 y 100" });
+    return;
+  }
+  if (requestedDiscountType === "MONTO" && requestedDiscountValue! > subtotal) {
+    res.status(400).json({ error: "El descuento no puede superar el subtotal" });
+    return;
+  }
+  const discountAmount = requestedDiscountType === "PORCENTAJE"
+    ? Math.round(subtotal * requestedDiscountValue! / 100)
+    : requestedDiscountType === "MONTO"
+      ? requestedDiscountValue!
+      : 0;
+  const discountType = discountAmount > 0 ? requestedDiscountType : null;
+  const discountValue = discountAmount > 0 ? requestedDiscountValue : null;
+  const price = subtotal - discountAmount;
   const [created] = await db
     .insert(orders)
     .values({
@@ -544,6 +676,10 @@ router.post("/orders", async (req, res) => {
       serviceId: primaryService.id,
       serviceName,
       vehicleSize: input.vehicleSize,
+      subtotal,
+      discountType,
+      discountValue,
+      discountAmount,
       price,
       enteredBy: actor,
       lastActionBy: actor,
@@ -556,7 +692,7 @@ router.post("/orders", async (req, res) => {
   await addAudit(
     actor,
     "ORDEN_CREADA",
-    `Orden ${orderNumber(created.id)} ingresada para ${created.plate} con ${serviceName}; total $${price.toLocaleString("es-CL")}`,
+    `Orden ${orderNumber(created.id)} ingresada para ${created.plate} con ${serviceName}; subtotal $${subtotal.toLocaleString("es-CL")}, descuento $${discountAmount.toLocaleString("es-CL")}, total $${price.toLocaleString("es-CL")}`,
     created.id,
   );
   const responseOrder = created.customerEmail
@@ -567,6 +703,18 @@ router.post("/orders", async (req, res) => {
       actor,
       "CAMBIO_DE_PRECIO",
       `Precio de la orden ${orderNumber(created.id)} ajustado a $${price.toLocaleString("es-CL")}`,
+      created.id,
+      "WARNING",
+    );
+  }
+  if (discountAmount > 0) {
+    const discountDescription = discountType === "PORCENTAJE"
+      ? `${discountValue}% ($${discountAmount.toLocaleString("es-CL")})`
+      : `$${discountAmount.toLocaleString("es-CL")}`;
+    await addAudit(
+      actor,
+      "DESCUENTO_APLICADO",
+      `Descuento de ${discountDescription} aplicado a la orden ${orderNumber(created.id)}`,
       created.id,
       "WARNING",
     );
@@ -639,6 +787,15 @@ router.patch("/orders/:id", async (req, res) => {
   const emailProvided = input.customerEmail !== undefined;
   const nextEmail = emailProvided ? input.customerEmail?.trim() || null : existing.customerEmail;
   const emailChanged = emailProvided && nextEmail !== existing.customerEmail;
+  const basePrice = input.priceOverride !== undefined && input.priceOverride !== null
+    ? input.priceOverride
+    : existing.subtotal ?? existing.price;
+  const priceChanged = input.priceOverride !== undefined && input.priceOverride !== null;
+  const discountAmount = existing.discountType === "PORCENTAJE" && existing.discountValue !== null
+    ? Math.round(basePrice * existing.discountValue / 100)
+    : existing.discountType === "MONTO" && existing.discountValue !== null
+      ? Math.min(existing.discountValue, basePrice)
+      : 0;
   const [updated] = await db
     .update(orders)
     .set({
@@ -646,13 +803,17 @@ router.patch("/orders/:id", async (req, res) => {
       phone: input.phone ?? existing.phone,
       customerEmail: nextEmail,
       ...(emailChanged ? { receiptEmailStatus: "NO_ENVIADO", receiptSentAt: null } : {}),
-      price: input.priceOverride ?? existing.price,
+      ...(priceChanged ? {
+        subtotal: basePrice,
+        discountAmount,
+        price: basePrice - discountAmount,
+      } : {}),
       lastActionBy: actor,
       updatedAt: new Date(),
     })
     .where(eq(orders.id, id))
     .returning();
-  if (input.priceOverride !== undefined && input.priceOverride !== existing.price) {
+  if (priceChanged && input.priceOverride !== existing.subtotal) {
     await addAudit(
       actor,
       "CAMBIO_DE_PRECIO",
@@ -703,6 +864,44 @@ router.post("/orders/:id/receipt", async (req, res) => {
   res.json(serializeOrder(updated));
 });
 
+router.post("/orders/:id/backup-notification", async (req, res) => {
+  const actor = requireActor(req, res);
+  if (!actor) return;
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  const [existing] = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Orden no encontrada" });
+    return;
+  }
+  if (existing.status !== "LISTO") {
+    res.status(409).json({ error: "La notificación está disponible al finalizar el servicio" });
+    return;
+  }
+  if (existing.backupNotificationStatus === "ENVIADO") {
+    res.status(409).json({ error: "La notificación de respaldo ya fue enviada" });
+    return;
+  }
+  if (existing.backupNotificationStatus === "ENVIANDO") {
+    res.status(409).json({ error: "La notificación de respaldo ya se está enviando" });
+    return;
+  }
+  const [settings] = await db.select().from(notificationSettings).limit(1);
+  if (!settings?.backupNotificationsEnabled || !settings.backupEmail) {
+    res.status(400).json({ error: "Configura y activa el correo de respaldo antes de reintentar" });
+    return;
+  }
+  const updated = await deliverBackupNotification(id, actor, req);
+  if (!updated) {
+    res.status(500).json({ error: "No se pudo actualizar el estado de la notificación" });
+    return;
+  }
+  res.json(serializeOrder(updated));
+});
+
 router.post("/orders/:id/status", async (req, res) => {
   const actor = requireActor(req, res);
   if (!actor) return;
@@ -726,7 +925,10 @@ router.post("/orders/:id/status", async (req, res) => {
     id,
     status === "ANULADO" ? "CRITICAL" : "INFO",
   );
-  res.json(serializeOrder(updated!));
+  const responseOrder = existing.status !== "LISTO" && status === "LISTO"
+    ? (await deliverBackupNotification(id, actor, req)) ?? updated!
+    : updated!;
+  res.json(serializeOrder(responseOrder));
 });
 
 router.post("/orders/:id/payment", async (req, res) => {
@@ -767,6 +969,53 @@ router.get("/audit", async (req, res) => {
   if (!requireActor(req, res)) return;
   const rows = await db.select().from(auditEvents).orderBy(desc(auditEvents.timestamp)).limit(100);
   res.json(rows.map(serializeAudit));
+});
+
+router.get("/settings/notifications", async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+  const [settings] = await db.select().from(notificationSettings).limit(1);
+  res.json(serializeNotificationSettings(settings));
+});
+
+router.put("/settings/notifications", async (req, res) => {
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+  const input = UpdateNotificationSettingsBody.parse(req.body);
+  const backupEmail = input.backupEmail?.trim().toLowerCase() || null;
+  if (input.backupNotificationsEnabled && !backupEmail) {
+    res.status(400).json({ error: "Agrega un correo antes de activar los avisos de respaldo" });
+    return;
+  }
+  const [updated] = await db
+    .insert(notificationSettings)
+    .values({
+      id: 1,
+      backupEmail,
+      backupNotificationsEnabled: input.backupNotificationsEnabled,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: notificationSettings.id,
+      set: {
+        backupEmail,
+        backupNotificationsEnabled: input.backupNotificationsEnabled,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+  if (!updated) {
+    res.status(500).json({ error: "No se pudo guardar la configuración de notificaciones" });
+    return;
+  }
+  await addAudit(
+    admin.userId,
+    "CORREO_RESPALDO_ACTUALIZADO",
+    input.backupNotificationsEnabled
+      ? "Avisos de servicio finalizado activados"
+      : "Avisos de servicio finalizado desactivados",
+  );
+  res.json(serializeNotificationSettings(updated));
 });
 
 router.get("/bootstrap", async (_req, res) => {
