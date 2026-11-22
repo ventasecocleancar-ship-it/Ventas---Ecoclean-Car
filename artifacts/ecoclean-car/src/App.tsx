@@ -30,8 +30,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 const queryClient = new QueryClient();
-const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
-const clerkPubKey = publishableKeyFromHost(window.location.hostname, import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
+const basePath = '';
+const clerkPubKey = '';
+
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 const clerkAppearance = {
   theme: shadcn,
