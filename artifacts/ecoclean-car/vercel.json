@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://ecoclean-api-appd.onrender.com/api/$1"
+    }
+  ]
+}
