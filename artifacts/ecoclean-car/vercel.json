@@ -1,8 +1,12 @@
 {
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://ecoclean-api-appd.onrender.com/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://ecoclean-api-appd.onrender.com/api/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
