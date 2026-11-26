@@ -6,13 +6,12 @@ const DEFAULT_REPLY_TO = "contacto.ecocleancar@gmail.com";
 
 function escapeHtml(value: string) {
   return value
-    .replaceAll("&", "&")
-    .replaceAll("<", "<")
-    .replaceAll(">", ">")
-    .replaceAll('"', """)
-    .replaceAll("'", "'");
+    .replaceAll("&", "&" + "amp;")
+    .replaceAll("<", "&" + "lt;")
+    .replaceAll(">", "&" + "gt;")
+    .replaceAll('"', "&" + "quot;")
+    .replaceAll("'", "&" + "#39;");
 }
-
 function formatClp(value: number) {
   return new Intl.NumberFormat("es-CL", {
     style: "currency",
