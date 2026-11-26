@@ -1,16 +1,24 @@
 import bwipjs from "bwip-js/node";
-import { ReplitConnectors } from "@replit/connectors-sdk";
 import type { Order } from "@workspace/db/schema";
 
-const connectors = new ReplitConnectors();
+const DEFAULT_FROM = "EcoClean Car <ventas@ecocleancardetailing.com>";
+const DEFAULT_REPLY_TO = "contacto.ecocleancar@gmail.com";
 
 function escapeHtml(value: string) {
   return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll("&", "&")
+    .replaceAll("<", "<")
+    .replaceAll(">", ">")
+    .replaceAll('"', """)
+    .replaceAll("'", "'");
+}
+
+function formatClp(value: number) {
+  return new Intl.NumberFormat("es-CL", {
+    style: "currency",
+    currency: "CLP",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
 export function orderBarcode(orderId: number) {
@@ -28,6 +36,51 @@ export async function createOrderBarcodePng(barcode: string) {
   });
 }
 
+async function sendEmailWithResend(params: {
+  to: string;
+  subject: string;
+  html: string;
+  barcodePng: Buffer;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error("Falta configurar RESEND_API_KEY en el servidor");
+  }
+
+  const from = process.env.EMAIL_FROM || DEFAULT_FROM;
+  const replyTo = process.env.EMAIL_REPLY_TO || DEFAULT_REPLY_TO;
+
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from,
+      to: [params.to],
+      reply_to: replyTo,
+      subject: params.subject,
+      html: params.html,
+      attachments: [
+        {
+          filename: "codigo-de-barras.png",
+          content: params.barcodePng.toString("base64"),
+          content_type: "image/png",
+          content_id: "ecoclean-barcode",
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "");
+    throw new Error(
+      `Resend rechazó el correo (HTTP ${response.status})${errorBody ? `: ${errorBody}` : ""}`,
+    );
+  }
+}
+
 export async function sendOrderReceipt(order: Order) {
   if (!order.customerEmail) {
     throw new Error("La orden no tiene correo del cliente");
@@ -35,25 +88,13 @@ export async function sendOrderReceipt(order: Order) {
 
   const barcode = orderBarcode(order.id);
   const png = await createOrderBarcodePng(barcode);
-  const boundary = `ecoclean-${order.id}-${Date.now().toString(36)}`;
-  const price = new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(order.price);
-  const subtotal = new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(order.subtotal ?? order.price);
-  const discount = new Intl.NumberFormat("es-CL", {
-    style: "currency",
-    currency: "CLP",
-    maximumFractionDigits: 0,
-  }).format(order.discountAmount ?? 0);
+  const price = formatClp(order.price);
+  const subtotal = formatClp(order.subtotal ?? order.price);
+  const discount = formatClp(order.discountAmount ?? 0);
   const payment = order.paymentMethod
     ? `Pagado con ${order.paymentMethod.toLowerCase()}`
     : "Pago pendiente";
+
   const html = `<!doctype html>
 <html lang="es">
   <body style="margin:0;background:#f4f5ec;color:#173a32;font-family:Arial,sans-serif">
@@ -78,39 +119,13 @@ export async function sendOrderReceipt(order: Order) {
     </main>
   </body>
 </html>`;
-  const rawMessage = [
-    `To: ${order.customerEmail}`,
-    `Subject: Comprobante EcoClean Car - ${barcode}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/related; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(html, "utf8").toString("base64"),
-    `--${boundary}`,
-    'Content-Type: image/png; name="codigo-de-barras.png"',
-    "Content-Transfer-Encoding: base64",
-    "Content-ID: <ecoclean-barcode>",
-    'Content-Disposition: inline; filename="codigo-de-barras.png"',
-    "",
-    png.toString("base64"),
-    `--${boundary}--`,
-    "",
-  ].join("\r\n");
-  const response = await connectors.proxy(
-    "google-mail",
-    "/gmail/v1/users/me/messages/send",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: Buffer.from(rawMessage, "utf8").toString("base64url") }),
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`Gmail rechazó el comprobante (HTTP ${response.status})`);
-  }
+
+  await sendEmailWithResend({
+    to: order.customerEmail,
+    subject: `Comprobante EcoClean Car - ${barcode}`,
+    html,
+    barcodePng: png,
+  });
 }
 
 export async function sendBackupServiceCompletedNotification(
@@ -119,19 +134,14 @@ export async function sendBackupServiceCompletedNotification(
 ) {
   const barcode = orderBarcode(order.id);
   const png = await createOrderBarcodePng(barcode);
-  const formatClp = (value: number) =>
-    new Intl.NumberFormat("es-CL", {
-      style: "currency",
-      currency: "CLP",
-      maximumFractionDigits: 0,
-    }).format(value);
   const subtotal = formatClp(order.subtotal ?? order.price);
   const discount = formatClp(order.discountAmount ?? 0);
   const total = formatClp(order.price);
-  const discountRow = order.discountAmount > 0
-    ? `<tr><td style="padding:9px 0;color:#2f9274">Descuento</td><td style="padding:9px 0;text-align:right;color:#2f9274">−${discount}</td></tr>`
-    : "";
-  const boundary = `ecoclean-finalizado-${order.id}-${Date.now().toString(36)}`;
+  const discountRow =
+    order.discountAmount > 0
+      ? `<tr><td style="padding:9px 0;color:#2f9274">Descuento</td><td style="padding:9px 0;text-align:right;color:#2f9274">−${discount}</td></tr>`
+      : "";
+
   const html = `<!doctype html>
 <html lang="es">
   <body style="margin:0;background:#f4f5ec;color:#173a32;font-family:Arial,sans-serif">
@@ -155,37 +165,11 @@ export async function sendBackupServiceCompletedNotification(
     </main>
   </body>
 </html>`;
-  const rawMessage = [
-    `To: ${recipient}`,
-    `Subject: EcoClean Car · Servicio finalizado · ${barcode}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/related; boundary="${boundary}"`,
-    "",
-    `--${boundary}`,
-    "Content-Type: text/html; charset=UTF-8",
-    "Content-Transfer-Encoding: base64",
-    "",
-    Buffer.from(html, "utf8").toString("base64"),
-    `--${boundary}`,
-    'Content-Type: image/png; name="codigo-de-barras.png"',
-    "Content-Transfer-Encoding: base64",
-    "Content-ID: <ecoclean-barcode>",
-    'Content-Disposition: inline; filename="codigo-de-barras.png"',
-    "",
-    png.toString("base64"),
-    `--${boundary}--`,
-    "",
-  ].join("\r\n");
-  const response = await connectors.proxy(
-    "google-mail",
-    "/gmail/v1/users/me/messages/send",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ raw: Buffer.from(rawMessage, "utf8").toString("base64url") }),
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`Gmail rechazó la notificación de servicio (HTTP ${response.status})`);
-  }
+
+  await sendEmailWithResend({
+    to: recipient,
+    subject: `EcoClean Car · Servicio finalizado · ${barcode}`,
+    html,
+    barcodePng: png,
+  });
 }
